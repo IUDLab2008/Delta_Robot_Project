@@ -1,0 +1,66 @@
+* {
+    font: "MS Shell Dlg 2";
+    color: rgb(250, 250, 250); 
+}
+
+
+QLineEdit {
+    font-style: italic;  
+}
+
+QComboBox, QLineEdit {
+    border: 2px solid rgb(0, 48, 72); 
+    border-radius: 5px; 
+    font-size: 15px;
+    color: rgb(0, 0, 0); 
+}
+
+QComboBox QAbstractItemView {
+    background-color: rgb(255, 255, 255);  
+    color: rgb(0, 0, 0);  
+}
+
+QPushButton {
+    font-size: 15px;
+    font-weight: bold;
+}
+
+#lb_title {
+    font-size: 30px;
+    font-weight: bold;  
+}
+
+#lb_status {
+    font-size: 25px;
+    font-weight: bold;
+    color:rgb(255, 0, 0);
+}
+
+
+#lb_angle1_1, #lb_angle2_1, #lb_angle3_1, #lb_angle1_2, #lb_angle2_2, #lb_angle3_2, #lb_x1, #lb_y1, #lb_x2, #lb_y2, #lb_z1, #lb_z2, #lb_serial, #lb_setting {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#lb_title_display, #lb_title_sending, #pbtn_menu {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#lb_display_angle1, #lb_display_angle2, #lb_display_angle3, #lb_display_x, #lb_display_y, #lb_display_z {
+    font-size: 20px;
+    color:rgb(0, 0, 0);
+}
+
+#lb_manual_mode, #lb_auto_mode, #lb_control_mode, #lb_baud, #lb_port {
+    font-size: 15px;
+    font-weight: bold;
+}
+
+#frame_sending_angle, #frame_sending_cartesian{
+    border: 2px solid rgb(0, 48, 72) ;
+    border-radius: 5px; /* Tùy chọn: bo tròn các góc */
+}
+
+
+
