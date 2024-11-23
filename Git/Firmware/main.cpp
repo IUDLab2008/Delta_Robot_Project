@@ -33,12 +33,12 @@ float _speed_lower_bound = 5;
 
 /***** Configure exclusive additional specifications of Stepper Motor *****/
 
-float _angle_offset_1    = 0;
+float _angle_offset_1    = 39.5894;
 int _angle_upper_bound_1 = 360;
 int _angle_lower_bound_1 = 0;
 bool _rotate_direction_1 = 1;
 
-float _angle_offset_2    = 0;
+float _angle_offset_2    = 191.7888 + 22.2874 - 44.2815 + 82.1114 -84.4574;
 int _angle_upper_bound_2 = 360;
 int _angle_lower_bound_2 = 0;
 bool _rotate_direction_2 = 1;
@@ -156,6 +156,8 @@ void setup() {
     stepper2._configure_additional_specifications(_angle_offset_2, _angle_upper_bound_2, _angle_lower_bound_2, _speed_upper_bound, _speed_lower_bound);
     stepper3._configure_additional_specifications(_angle_offset_3, _angle_upper_bound_3, _angle_lower_bound_3, _speed_upper_bound, _speed_lower_bound);
 
+
+
     /***** Stepper Timer Enable */
     stepper1._Timer_enable();
     stepper1._Set_rpm(_rpm);
@@ -175,6 +177,12 @@ ISR(USART0_RX_vect)
     _UART_ISR_handle(stepper2._desired_value);
     _UART_ISR_handle(stepper3._desired_value);
 
+    char terminator = _UART_Receive(); // Expect the '\n' at the end of the 3-float package
+    if (terminator != '\n')
+    {
+        //Handle failing case
+    }
+
     stepper1._Set_Direction();
     stepper1._Timer_re_enable();
 
@@ -188,9 +196,9 @@ ISR(USART0_RX_vect)
 
 ISR(TIMER4_COMPA_vect)
 {
-    // stepper1._ISR_execute_Angle();
-    // stepper2._ISR_execute_Angle();
-    // stepper3._ISR_execute_Angle();
+    stepper1._ISR_execute_Angle();
+    stepper2._ISR_execute_Angle();
+    stepper3._ISR_execute_Angle();
     ;
 }
 
@@ -204,10 +212,10 @@ ISR(TIMER3_COMPA_vect)
 
 ISR(TIMER1_COMPA_vect)
 {
-    stepper1._ISR_execute_Angle();
-    stepper2._ISR_execute_Angle();
-    stepper3._ISR_execute_Angle();
-    
+    // stepper1._ISR_execute_Angle();
+    // stepper2._ISR_execute_Angle();
+    // stepper3._ISR_execute_Angle();
+    ;
 }
 
 void loop() {
