@@ -12,67 +12,16 @@ from delta_ui import Ui_DeltaGUI
 import icons_rc
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../Back-end')))
 import converted as cv
-
-
-class SerialPortScanner(QThread):
-    ports_updated = pyqtSignal(list)
-    def __init__(self):
-        super().__init__()
-        self.running = True
-
-    def run(self):
-        previous_ports = set()
-        while self.running:
-            current_ports = set([port.device for port in serial.tools.list_ports.comports()])
-            if current_ports != previous_ports:
-                self.ports_updated.emit(list(current_ports))
-                previous_ports = current_ports
-            self.msleep(1000)  
-
-    def stop(self):
-        self.running = False
+import delta_serial as ser
         
-class SerialReader(QThread):
-    data_received = pyqtSignal(float, float, float)  
-
-    def __init__(self, port, baudrate):
-        super().__init__()
-        self.port = port 
-        self.baudrate = baudrate
-        self.running = True
-
-    def run(self):
-        try:
-            ser = serial.Serial(self.port, self.baudrate, timeout=1)
-            print(f"Successfully connected to {self.port} at baud rate {self.baudrate}")
-
-            while self.running:
-                if ser.in_waiting >= 12:  
-                    data = ser.read(12)  
-                    angles = struct.unpack('fff', data)  
-                    self.data_received.emit(*angles)  
-
-        except serial.SerialException as e:
-            print(f"Error: {e}")
-        finally:
-            if ser.is_open:
-                ser.close()
-                print("Connection closed.")
-                
-    def stop(self):
-        self.running = False
-        self.wait()
-
 
 class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.ui = Ui_DeltaGUI()
         self.ui.setupUi(self)
+        self.status = "Disconnected"
         
-        self.status = "Disconnected"  # Status of the connection
-        self.serial_connection = None  # Serial connection object
-
         # Load the stylesheet
         self.load_stylesheet('styles.css')
         # Set the size
@@ -105,8 +54,9 @@ class Window(QWidget):
         self.ui.pbtn_setting.clicked.connect(lambda: self.ui.stackedWidget.setCurrentWidget(self.ui.setting_page))
         ###########################################################################################################
 
-        # ENABLE SENDING DATA
+        # ENABLE OBJECT BEFORE CONNECTING
         ###########################################################################################################
+        self.ui.cbb_control_mode.setEnabled(False)
         self.ui.le_input_angle1.setEnabled(False)
         self.ui.le_input_angle2.setEnabled(False)
         self.ui.le_input_angle3.setEnabled(False)
@@ -145,7 +95,7 @@ class Window(QWidget):
         # SET UP COMBOBOXES
         ###########################################################################################################
         # Port
-        self.serial_scanner = SerialPortScanner()
+        self.serial_scanner = ser.SerialPortScanner()
         self.serial_scanner.ports_updated.connect(self.update_com_ports)
         self.serial_scanner.start()
         # Baudrate
@@ -311,44 +261,46 @@ class Window(QWidget):
         port = self.ui.cbb_port.currentText()
         baudrate = self.ui.cbb_baud.currentText()
         try:
-            self.serial_reader = SerialReader(port, int(baudrate))
-            self.serial_reader.data_received.connect(self.display_data)  
-            self.serial_reader.start()  
-
+            self.serial_handle = ser.SerialHandle(port, int(baudrate))
+            self.serial_handle.data_received.connect(self.display_data)  
+            self.serial_handle.start()  
             self.show_message("Success", f"Successfully connected to {port} at {baudrate} baud.")
             self.status = "Connected"
-
+            self.ui.cbb_control_mode.setEnabled(True)
+            self.ui.cbb_control_mode.setStyleSheet("background-color: rgb(255, 255, 255);")
+            
         except serial.SerialException as e:
             self.show_message("Error", f"Error connecting to {port}: {e}")
             self.status = "Disconnected"
-            
+    
     # Disconnect serial function
     def disconnect_serial(self):
-        if self.serial_connection and self.serial_connection.isOpen():
-            self.serial_connection.close()
-            if self.serial_reader:
-                self.serial_reader.stop()
-                self.serial_reader = None
-            self.show_message("Success", "Successfully disconnected.")
-            self.status = "Disconnected"  
-        else:
-            self.show_message("Error", "No connection to disconnect.")
-            
+        try: 
+            if hasattr(self, 'serial_handle') and self.serial_handle.is_running:
+                self.serial_handle.stop()
+                self.serial_handle.wait()
+                self.show_message("Success", "Disconnected successfully.")
+                self.status = "Disconnected" 
+                self.ui.cbb_control_mode.setEnabled(False)
+                self.ui.cbb_control_mode.setStyleSheet("background-color: rgb(200, 200, 200);")
+            else:
+                self.show_message("Warning", "No active serial connection to disconnect.")
+        except Exception as e:
+            self.show_message("Error", f"Error while disconnecting: {e}")            
+
     # Pause serial function
     def pause_serial(self):
-        if self.serial_connection and self.serial_connection.isOpen():
-            self.show_message("Pause", "Connection paused.")
-            self.status = "Pause"  
-        else:
-            print("No connection to pause.")
-            self.show_message("Error", "No connection to pause.")
-            
-    # Process serial data and display angles and coordinates
-    def process_serial_data(self, data):
-        if len(data) == 12:
-            angles = struct.unpack('fff', data)
-            self.display_data(*angles)
+        try:
+            if hasattr(self, 'serial_handle') and self.serial_handle.is_running:
+                self.serial_handle.pause()
+                self.show_message("Success", "Serial reading paused.")
+                self.status = "Paused"
+            else:
+                self.show_message("Warning", "No active serial connection to pause.")
+        except Exception as e:
+            self.show_message("Error," f"Error while pause: {e}")
     
+            
     # Display angles and coordinates
     def display_data(self, angle1, angle2, angle3):
         self.ui.lb_display_angle1.setText(f"{angle1:.2f}°")
@@ -366,43 +318,33 @@ class Window(QWidget):
         
     # Sending data to the serial port
     def send_data(self):
+        if hasattr(self, 'serial_connection'):
+            self.serial_handle.pause()
         # Get data from the input fields
         try:
-            angle1 = float(self.ui.le_input_angle1.text())
-            angle2 = float(self.ui.le_input_angle2.text())
-            angle3 = float(self.ui.le_input_angle3.text())
+            if self.ui.cbb_manual_mode.currentText() == "Angle" and self.ui.cbb_control_mode.currentText() == "Manual" and self.status == "Connected": 
+                para1 = float(self.ui.le_input_angle1.text())
+                para2 = float(self.ui.le_input_angle2.text())
+                para3 = float(self.ui.le_input_angle3.text())
+            elif self.ui.cbb_manual_mode.currentText() == "Cartesian" and self.ui.cbb_control_mode.currentText() == "Manual" and self.status == "Connected": 
+                para1 = float(self.ui.le_input_x.text())
+                para2 = float(self.ui.le_input_y.text())
+                para3 = float(self.ui.le_input_z.text())
             
-            x = float(self.ui.le_input_x.text())
-            y = float(self.ui.le_input_y.text())
-            z = float(self.ui.le_input_z.text())
-            
-            # Creat object "_element" fron the converted.py
-            element_angle = float(cv._element(angle1, angle2, angle3))
-            element_xyz = float(cv._element(cv._Inverse_Kinematic(x, y, z)))
-            
-            # Create object "_element" from the converted.py
-            element_angle = cv._element(angle1, angle2, angle3)
-            element_xyz = cv._element(cv._Inverse_Kinematic(x, y, z))
-            
-            # Convert to string and encode before sending
-            element_angle_str = f"{element_angle[0]},{element_angle[1]},{element_angle[2]}"
-            element_xyz_str = f"{element_xyz[0]},{element_xyz[1]},{element_xyz[2]}"
-            
-            # Append the object to the _Segment list
-            # cv._Segment.append(element_angle)
-            # cv._Segment.append(element_xyz)
             port = self.ui.cbb_port.currentText()
-            baud_rate = self.ui.cbb_baud.currentText()
-            ser = serial.Serial(port, baud_rate)
+            baud_rate = int(self.ui.cbb_baud.currentText())
+            print(f"Connecting to port: {port} with baud rate: {baud_rate}")
+            self.serial_handle.send_data(self.ui.cbb_manual_mode.currentText(), para1, para2, para3)
+           
             
-            ser.write(element_xyz.encode())
-            ser.write(element_angle.encode())
-            
-            # print(cv._Segment)
-            
-        except ValueError:
-            self.show_message("Error", "Please enter valid angles.")
-            return    
+        except serial.SerialException as e:
+            print(f"Serial error: {e}")
+        except Exception as e:
+            print(f"Error: {e}")   
+        finally:
+            # Tiếp tục việc nhận dữ liệu
+            if hasattr(self, 'serial_connection'):
+                self.serial_connection.resume()
     
     # Add file function
     def add_file(self):

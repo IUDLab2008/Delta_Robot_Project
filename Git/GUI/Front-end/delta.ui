@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Delta GUI</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="icons/icons.qrc">
+    <normaloff>:/icons/icons8-robot-2-64.png</normaloff>:/icons/icons8-robot-2-64.png</iconset>
+  </property>
   <property name="styleSheet">
    <string notr="true">*{
 	border: none;

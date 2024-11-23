@@ -1,4 +1,5 @@
 #include "Stepper.h"
+#include <Arduino.h>
 
 
 #define FOSC 16000000UL// Clock Speed
@@ -117,16 +118,13 @@ unsigned char _UART_Receive(void)
 
 void _Transmit_Float(float _data)                                                                               
 {
-
-    char index = 3;
+    
     uint8_t* ptr  = (uint8_t* )&_data;
 
-    while(index >= 0)
+    for (int i = 0; i < 4; i++)
     {
-        _UART_Transmit ( *(ptr + index) );
-        index --;
+        _UART_Transmit (*(ptr + i));
     }
-
 }
 
 void _UART_ISR_handle(float& _angle)                                                            //Execute in USART0 Rx for receving float data type
@@ -144,17 +142,15 @@ void _UART_ISR_handle(float& _angle)                                            
 }
 
 
-
-
 /***** MAIN PROGRAM *****/
 
 void setup() {
     _UART_init(MYUBRR);
 
     /***** Stepper initializing phase *****/
-    stepper1._configure_additional_specifications(_angle_offset_1, _angle_upper_bound_1, _angle_lower_bound_1, _speed_upper_bound, _speed_lower_bound);
-    stepper2._configure_additional_specifications(_angle_offset_2, _angle_upper_bound_2, _angle_lower_bound_2, _speed_upper_bound, _speed_lower_bound);
-    stepper3._configure_additional_specifications(_angle_offset_3, _angle_upper_bound_3, _angle_lower_bound_3, _speed_upper_bound, _speed_lower_bound);
+    // stepper1._configure_additional_specifications(_angle_offset_1, _angle_upper_bound_1, _angle_lower_bound_1, _speed_upper_bound, _speed_lower_bound);
+    // stepper2._configure_additional_specifications(_angle_offset_2, _angle_upper_bound_2, _angle_lower_bound_2, _speed_upper_bound, _speed_lower_bound);
+    // stepper3._configure_additional_specifications(_angle_offset_3, _angle_upper_bound_3, _angle_lower_bound_3, _speed_upper_bound, _speed_lower_bound);
 
 
 
@@ -178,8 +174,7 @@ ISR(USART0_RX_vect)
     _UART_ISR_handle(stepper3._desired_value);
 
     char terminator = _UART_Receive(); // Expect the '\n' at the end of the 3-float package
-    if (terminator != '\n')
-    {
+    if (terminator != '\n') {
         //Handle failing case
     }
 
@@ -223,7 +218,7 @@ void loop() {
     _Transmit_Float(stepper1._get_Angle());
     _Transmit_Float(stepper2._get_Angle());
     _Transmit_Float(stepper3._get_Angle());
-
+    _UART_Transmit('\n');
     delay(1000);
 
 }

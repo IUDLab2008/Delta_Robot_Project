@@ -59,7 +59,7 @@ QPushButton {
 
 #frame_sending_angle, #frame_sending_cartesian{
     border: 2px solid rgb(0, 48, 72) ;
-    border-radius: 5px; /* Tùy chọn: bo tròn các góc */
+    border-radius: 5px;
 }
 
 

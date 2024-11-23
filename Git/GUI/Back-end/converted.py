@@ -280,7 +280,7 @@ def _G_Code_Execute(Input):
 
 
 
-def _Segment_Update():
+def _Segment_Update(_):
     
     if (not len(_G_Code_Queue) ):
         return 
