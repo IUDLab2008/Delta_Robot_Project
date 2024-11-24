@@ -84,10 +84,11 @@ class SerialHandle(QThread):
                 else:
                     element = cv._element(para1, para2, para3)
                 # Package the data
-                element_str = f"{element._get_Value(1)}, {element._get_Value(2)}, {element._get_Value(3)}"
-                print(f"Sent: {element_str}")
+                element_str_1 = f"{element._get_Value(1)}, {element._get_Value(2)}, {element._get_Value(3)}"
+                element_str_2 = struct.pack("fff", element._get_Value(1), element._get_Value(2), element._get_Value(3))
+                print(f"Sent: {element_str_1}")
                 # Sending the data
-                self.ser.write(element_str.encode())
+                self.ser.write(element_str_2)
                 # Sending '\n' character to indicate the end of the data
                 self.ser.write(b'\n') 
             else:
