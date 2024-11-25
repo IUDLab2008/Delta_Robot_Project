@@ -105,7 +105,7 @@ class SerialHandle(QThread):
                 
                 #print(f"Sent: {element_str_1}")
                 # Sending the data
-                self.ser.write(bytearray(temporary_storage))
+                # self.ser.write(bytearray(temporary_storage))
                 # Sending '\n' character to indicate the end of the data
                 self.ser.write(b'\n') 
             else:
