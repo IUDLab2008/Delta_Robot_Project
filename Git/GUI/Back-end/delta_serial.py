@@ -5,6 +5,7 @@ import serial
 import os
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 import converted as cv
+from serial import PARITY_EVEN, STOPBITS_ONE
 
 
 class SerialPortScanner(QThread):
