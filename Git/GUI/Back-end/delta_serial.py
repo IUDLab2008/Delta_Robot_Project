@@ -35,6 +35,8 @@ class SerialHandle(QThread):
         super().__init__()
         self.port = port 
         self.baudrate = baudrate
+        self.parity = PARITY_EVEN
+        self.stopbits = STOPBITS_ONE
         self.is_running = True
         self.is_paused = False
         self.ser = None
@@ -76,10 +78,12 @@ class SerialHandle(QThread):
         self.is_paused = False
 
     # Flip byte order in Float
-    def float_to_uint8_array_flipped(value):
+    def float_to_uint8_array_flipped(self, value):
     # Convert the float to a 4-byte array
-        packed = struct.pack('<f', value)  # '<f' = little-endian single-precision float
-        uint8_array = list(packed)  # Convert bytes to a list of uint8 values
+        # '<f' = little-endian single-precision float
+        packed = struct.pack('<f', value)
+        # Convert bytes to a list of uint8 values
+        uint8_array = list(packed)  
         # Reverse the order of the array
         flipped_array = uint8_array[::-1]
         return flipped_array
@@ -97,17 +101,17 @@ class SerialHandle(QThread):
                 bytes_to_send = []
                 for i in range(1, 4):
                     value = element._get_Value(i)
-                    bytes_to_send.extend(float_to_uint8_array_flipped(value))
+                    bytes_to_send.extend(self.float_to_uint8_array_flipped(value))
                     
                 # Send all data at once
                 self.ser.write(bytearray(bytes_to_send))
+                # Sending '\n' character to indicate the end of the data
                 self.ser.write(b'\n')
                 
                 #print(f"Sent: {element_str_1}")
                 # Sending the data
                 # self.ser.write(bytearray(temporary_storage))
-                # Sending '\n' character to indicate the end of the data
-                self.ser.write(b'\n') 
+                
             else:
                 print("Serial port is not open.")
         except serial.SerialException as e:
