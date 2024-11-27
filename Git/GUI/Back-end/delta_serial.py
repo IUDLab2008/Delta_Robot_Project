@@ -43,7 +43,7 @@ class SerialHandle(QThread):
     # Receiving data from delta
     def run(self):
         try:
-            self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
+            self.ser = serial.Serial(self.port, self.baudrate, self.parity, self.stopbits, timeout=1)
             print(f"Successfully connected to {self.port} at baud rate {self.baudrate}")
 
             while self.is_running:
