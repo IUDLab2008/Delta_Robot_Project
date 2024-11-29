@@ -44,7 +44,7 @@ class SerialHandle(QThread):
     # Receiving data from delta
     def run(self):
         try:
-            self.ser = serial.Serial(self.port, self.baudrate, self.parity, self.stopbits, timeout=1)
+            self.ser = serial.Serial(port = self.port, baudrate = self.baudrate, parity = self.parity, stopbits = self.stopbits, timeout = 1)
             print(f"Successfully connected to {self.port} at baud rate {self.baudrate}")
 
             while self.is_running:
@@ -102,10 +102,7 @@ class SerialHandle(QThread):
                 bytes_to_send = []
                 for i in range(1, 4):
                     value = element._get_Value(i)
-                    bytes_to_send.extend(self.float_to_uint8_array_flipped(value))
-                    
-                # Send all data at once
-                self.ser.write(bytearray(bytes_to_send))
+                    self.ser.write(bytearray(self.float_to_uint8_array_flipped(value)))
                 # Sending '\n' character to indicate the end of the data
                 self.ser.write(b'\n')
                 
