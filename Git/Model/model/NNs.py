@@ -7,8 +7,6 @@ import torch.optim as optim
 
 torch.set_default_dtype(torch.float32)
 
-device = 'cpu' if torch.cuda.is_available() else 'cpu'
-
 
 #---Declare global variable for dynamic system dimensions---#
 f = 0.06
@@ -28,11 +26,14 @@ Description:
     Based on Cholesky Descomposition: M can be seen as L @ L.T with L is a lower triangular matrix, which is the combination of a diagonal matrix L_d and a strictly lower triangular matrix L_o
     This module utilizes the input "q" to predict L_d, L_o which then produce L and M    
 """
+
+#---Thay vì phân ra thành 2 Network thì dùng 1 cái với output là 6, chỉ dùng activation Softplus cho layer cuối---#
 class M_NNs(nn.Module):
-    def __init__(self, input_dim = 3, output_dim = 3, hidden_layer_dim = 128, num_hidden_layer = 3):
+    def __init__(self, device, input_dim = 3, output_dim = 6, hidden_layer_dim = 128, num_hidden_layer = 5, activation = 'tanh'):
 
         super(M_NNs, self).__init__()
         
+        self.device = device
         self.epoch = 0
 
         # Define the hidden layers
@@ -42,17 +43,16 @@ class M_NNs(nn.Module):
         
         # Add the final output layer
         self.L_d_layers.append(nn.Linear(hidden_layer_dim, output_dim))
-        
-        # Define the hidden layers
-        self.L_o_layers = nn.ModuleList([nn.Linear(input_dim, hidden_layer_dim)])
-        for _ in range(num_hidden_layer - 1):
-            self.L_o_layers.append(nn.Linear(hidden_layer_dim, hidden_layer_dim))
-        
-        # Add the final output layer
-        self.L_o_layers.append(nn.Linear(hidden_layer_dim, output_dim))
 
         # Choose activation function for hidden layers
-        self.activation = nn.Softplus()
+        if activation == 'sin':
+          self.activation = torch.sin
+        elif activation == 'tanh':
+          self.activation = torch.tanh
+        elif activation == 'relu':
+          self.activation = torch.nn.ReLU()
+        else:
+          self.activation = torch.nn.LeakyReLU()
 
         # Softplus for the last activation layer
         self.last_activation = nn.Softplus()
@@ -61,27 +61,22 @@ class M_NNs(nn.Module):
         batch_size = q.shape[0]
         
         out_1 = q
-        out_2 = q
         for layer in self.L_d_layers[:-1]:
             out_1 = self.activation(layer(out_1)) if isinstance(self.activation, nn.Module) else self.activation(layer(out_1))
-            
-        for layer in self.L_o_layers[:-1]:
-            out_2 = self.activation(layer(out_2)) if isinstance(self.activation, nn.Module) else self.activation(layer(out_2))
         
         # Apply the final layer and Softplus activation
         out_1 = self.last_activation(self.L_d_layers[-1](out_1))
-        out_2 = self.last_activation(self.L_o_layers[-1](out_2))
-        
-        L = torch.zeros((batch_size, 3, 3), device = device)
+                        
+        L = torch.zeros((batch_size, 3, 3), device = self.device)
         L [:, 0, 0] = out_1[:, 0]
         L [:, 1, 1] = out_1[:, 1]
         L [:, 2, 2] = out_1[:, 2]
         
-        L [:, 1, 0] = out_2[:, 0]
-        L [:, 2, 0] = out_2[:, 1]
-        L [:, 2, 1] = out_2[:, 2]
+        L [:, 1, 0] = out_1[:, 3]
+        L [:, 2, 0] = out_1[:, 4]
+        L [:, 2, 1] = out_1[:, 5]
         
-        return L @ L.T
+        return L @ L.permute(0, 2, 1)
     
     
 #---Simple NNs for Gravitational matrix according to the publication---#
@@ -90,12 +85,12 @@ Module Name: G_NNs
 Description:
     This module predicts the elements of G(q)
     This module utilizes inputs "cos(q)" which yields the results of G(q)
-
 """
 class G_NNs(nn.Module):
-    def __init__(self, input_dim = 3, output_dim = 3, hidden_layer_dim = 128, num_hidden_layer = 3, activation='tanh'):
+    def __init__(self, device, input_dim = 3, output_dim = 3, hidden_layer_dim = 128, num_hidden_layer = 3, activation='tanh'):
 
         super(G_NNs, self).__init__()
+        self.device = device
 
         # Define the hidden layers
         self.layers = nn.ModuleList([nn.Linear(input_dim, hidden_layer_dim)])
@@ -119,12 +114,13 @@ class G_NNs(nn.Module):
 
     def forward(self, q):
         batch_size = q.shape[0]
-        
+
         out = torch.cos(q)
         for layer in self.layers[:-1]:
             out = self.activation(layer(out))
-        out = self.layers[-1](out)
-        out = torch.reshape(out, (batch_size, 3, 1))
+        out = self.layers[-1](out).to(self.device)
+        out = out.unsqueeze(-1)
+        #out = torch.reshape(out, (batch_size, 3, 1))
         return out
 
 
@@ -139,10 +135,11 @@ Description:
 
 """
 class B_NNs(nn.Module):
-    def __init__(self, input_dim = 3, output_dim = 1, hidden_layer_dim = 128, num_hidden_layer = 3, activation='tanh'):
+    def __init__(self, device, input_dim = 3, output_dim = 3, hidden_layer_dim = 128, num_hidden_layer = 3, activation='tanh'):
 
         super(B_NNs, self).__init__()
-
+        self.device = device
+        
         # Define the hidden layers
         self.layers = nn.ModuleList([nn.Linear(input_dim, hidden_layer_dim)])
         for _ in range(num_hidden_layer - 1):
@@ -169,25 +166,23 @@ class B_NNs(nn.Module):
         out = s_Ddot
         for layer in self.layers[:-1]:
             out = self.activation(layer(out))
-        out = self.layers[-1](out)
-        
-        B = torch.ones((batch_size, 3, 1), device = device)
-        B[:, 0, 0] = out[:, 0]
-        B[:, 1, 0] = out[:, 1]
-        B[:, 2, 0] = out[:, 2]
+        out = self.layers[-1](out).to(self.device)
+        out = out.unsqueeze(-1)
+                
+        #out = torch.reshape(out, (batch_size, 3, 1))
         
         #----------------Define K matrix---------------------#
         K11 = (s[:, 0] * torch.cos((alpha[0])) + s[:, 1] * torch.sin((alpha[0])) + f - e) * torch.sin(q[:, 0]) - s[:, 2] * torch.cos(q[:, 0])
         K22 = (s[:, 0] * torch.cos((alpha[1])) + s[:, 1] * torch.sin((alpha[1])) + f - e) * torch.sin(q[:, 1]) - s[:, 2] * torch.cos(q[:, 1])
         K33 = (s[:, 0] * torch.cos((alpha[2])) + s[:, 1] * torch.sin((alpha[2])) + f - e) * torch.sin(q[:, 2]) - s[:, 2] * torch.cos(q[:, 2])
         
-        K = torch.zeros((q.shape[0], 3, 3))                                                            
+        K = torch.zeros((q.shape[0], 3, 3), device= self.device)                                                            
         K[:, 0, 0] = K11
         K[:, 1, 1] = K22
         K[:, 2, 2] = K33
         
         #--------------------------------Define A matrix--------------------------------#
-        A = torch.zeros((q.shape[0], 3, 3))                                                             # batch_size x 3 x 3
+        A = torch.zeros((q.shape[0], 3, 3), device= self.device)                                                             # batch_size x 3 x 3
         
         A[:, 0, 0] = s[:, 0] + e * torch.cos((alpha[0])) - f * torch.cos((alpha[0])) - l_1 * torch.cos((alpha[0])) * torch.cos(q[:, 0]) # shape: batch_size
         A[:, 0, 1] = s[:, 0] + e * torch.cos((alpha[1])) - f * torch.cos((alpha[1])) - l_1 * torch.cos((alpha[1])) * torch.cos(q[:, 1]) # shape: batch_size
@@ -201,4 +196,9 @@ class B_NNs(nn.Module):
         A[:, 2, 1] = s[:, 2] - l_1 * torch.cos(q[:, 1]) # shape: batch_size
         A[:, 2, 2] = s[:, 2] - l_1 * torch.cos(q[:, 2]) # shape: batch_size
         
-        return  K @ torch.linalg.inv(A) @ B
+        #print('A shape:', A.shape)
+        #print('K shape:', K.shape)
+        #print('out shape:', out.shape)
+        #print('multiplication shape:', (K @ torch.linalg.inv(A) @ out).shape)"""
+        
+        return K @ torch.linalg.inv(A) @ out    # shape: batch_size x 3 x 1

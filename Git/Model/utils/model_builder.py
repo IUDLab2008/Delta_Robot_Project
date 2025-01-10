@@ -4,8 +4,8 @@ Module Name: Model Builder
 Purpose:
     This module provides simple training method:
         In which it loads datas via MatDataLoader, then, divides it into smaller batches of training data and validate data
-        __train_epoch() performs simple optimizer step: calculate loss for training data and backpropagate
-        __val_epoch() performs simple optimizer step: calculate loss for training data and backpropagate
+        __train_epoch() performs simple optimizer step: calculate loss for training data and back-propagate
+        __val_epoch() performs simple optimizer step: calculate loss for training data and back-propagate
     This module also provides K-Fold Cross Validation
 """
 
@@ -16,13 +16,14 @@ from torch.utils.data import Subset
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from dataloader import MatDataLoader
-from PINNs import PINNs
+from DeLan import Dynamic_System
 
 
-class Simple_Training:
-    def __init__(self,training_data,validate_data = None,criterion = nn.MSELoss()):
+class Simple_Training(Dynamic_System):
+    def __init__(self,training_data,validate_data = None, training_batch, criterion = nn.MSELoss()):
         self.training_data = training_data
         self.validate_data = validate_data
+        self.training_batch = training_data
         self.criterion = criterion
         
     def training(self,model,device,optimizer,num_epochs=1,batch = 1,visualize = 1):
@@ -30,7 +31,7 @@ class Simple_Training:
         val_loss = 0.0
         for epoch in range(num_epochs):
             training_data = MatDataLoader(training_directory = "", data_length = )
-            train_dataloader = DataLoader(training_data, batch_size = training_batch, shuffle = True)
+            train_dataloader = DataLoader(training_data, batch_size = 64, shuffle = True)
             
             val_data = MatDataLoader(validation_directory = "", data_length = )
             val_dataloader = DataLoader(val_data, batch_size = 1, shuffle = True)
