@@ -2,85 +2,68 @@
 #define STEPPER_H
 
 #include <Arduino.h>
-#include "TCA9548.h"
-#include "AS5600.h"
-#include "Wire.h"
+#include <ArduinoSTL.h>
 
-#define RAW_TO_ANGLE 360/4096/13.7
+#include "Constant.h"
+#include "PinOut.h"
+#include "Data.h"
+#include <queue>
 
-class _Stepper_Motor {
+using namespace std;
 
+class Stepper {
     private:
-        bool _rotate_direction;                                 //Storing rotate direction
-                                                                //0     -       Quay lên trời          (khi lật ngửa)
-                                                                //1     -       Quay xuống             (khi lật ngửa)
-                                                                
-        int _rpm;                                               //Storing desired RPM (Revolution per Minute) for both Constant Speed mode (Angle mode) and Varying Speed mode (Angular Speed mode)
+    /*
+        Args:
+            rotateDirection: Specify the conventional Stepper initial Rotating Direction
+                                0   -   ClockWise;
+                                1   -   CounterClockWise;
+            stepPerRev:      Specify the total Steps to complete one Revolution
+            order     :      Specify the order of StepperMotor (0 - 1st Motor, 1 - 2nd Motor, 2 - 3rd Motor)
+            ENA_PIN   :      Specify the Enable Pin of Driver
+            DIR_PIN   :      Specify the Direction Pin of Driver
+            STEP_PIN  :      Specify the Pulse Pin of Driver
+            ENCODER_PIN:     Specify the input Pin of Potentiometer
+            angularResolution: Specify the degree per one Step
+            angleOffset:     Offset of feedback encoder due to mouting
+            isRunning :      Store the operating state of Motor
+            ellapsedInterrupt: Store the ellapsed number of Interrupt 
+            numInterrupt:    Store the number of Interrupt after fetching GCode
+            rpmQueue:        Store the angular velocities after fetching GCode
+    */
 
-        int _step;                                              //Storing total number of Step per Revolution
-        byte _mode;                                             //Storing Step mode of Stepper Motor 
-                                                                //1     -       Full step
-                                                                //2     -       Half step
-                                                                //4     -       Quarter step
-                                                                //8     -       Eighth step
-                                                                //16    -       Sixteenth step
+        bool rotateDirection;  
+        int stepPerRev;
+        byte order;
+        byte mode;
+        byte ENA_PIN;
+        byte DIR_PIN;
+        byte STEP_PIN;
+        byte ENCODER_PIN;
+        float angularResolution;
+        float angleOffset;
+        bool isRunning;
+        bool isHoming = 1;
 
-        byte _enable_pin;                                       //Storing Enable Pin
-        byte _dir_pin;                                          //Storing Direction Pin
-        byte _step_pin;                                         //Storing Step Pin, the Pin must be assigned from 4 available Pins (the selection must not be overlapped)
-                                                                //OC1[A:B:C]      -       D11/12/13 or PB5/PB6/PB7                 (all can be used)
-                                                                //OC3[A:B:C]      -       D5/2/3    or PE3/PE4/PE5                 (all can be used)
-                                                                //OC4[A:B:C]      -       D6/7/8    or PH3/PH4/PH5                 (can not use D6)
-                                                                //OC5[A:B:C]      -       D44/45/46 or PL5/PL4/PL3                 (can not use D44-46)                  (Least favorable)
-                                                                
+        int ellapsedInterrupt = 0;
+        queue<int> numInterrupt;
+        queue<float> rpmQueue;
 
-        float _res;                                             //Storing Resolution of the Stepper with assigned Step mode (as stored in _mode)
+        float desiredAngle = 0;
 
-        bool _timer_state;                                      //Storing Timer status
-                                                                //0 - Timer off
-                                                                //1 - Timer on
-
-        float _speed_upper_bound;                               //Storing Angular Speed Upper Bound of Stepper
-        float _speed_lower_bound;                               //Storing Angular Speed Lower Bound of Stepper
-
-        float _angle_offset;                                    //Storing Angular offset
-
-        byte _order;                                            //Storing The Order of the Motor
-                                                                //0 - Motor #1
-                                                                //1 - Motor #2
-                                                                //2 - Motor #3
-
-        AS5600 encoder;
     public:
-        float _desired_value = 0;                               //Storing Desired Angle value                                              (Angle mode)
-        float _current_angle = 0;
-
-        int _angle_upper_bound;                                 //Storing Angular Upper Bound of Stepper
-        int _angle_lower_bound;                                 //Storing Angular Lower Bound of Stepper
-
-        _Stepper_Motor(byte PUL_PIN, byte DIR_PIN, byte ENA_PIN, byte MODE, byte STEP, byte ORDER, bool rotate_dir);                //Configure Stepper Motor  
-        void _configure_additional_specifications(float angle_offset, int angle_upper_bound, int angle_lower_bound, float speed_upper_bound, float speed_lower_bound, TCA9548 multiplexerInstance);                         //Configure additional specifications of Stepper Motor
-
-        void _Timer_enable(void);                               //Enable the Timer                                          
-                                                                //Execute once in Initializing phase                                                                 
-        void _Timer_disable(void);                              //Disable the Timer
-        void _Timer_re_enable(void);                            //Re-enable the Timer
-                                                    
-        
-        void _Set_rpm(int _rpm);                                //Set desired RPM (Revolution per Minute) for Constant Speed mode and Varying Speed mode       (Angle mode & Speed mode)
-                                                                //Invoke Once in Initialize phase                
-
-        void _Set_Angle(float _desired_value);                  //Set desired Angle for Constant Speed mode                                                   (Angle mode)
-
-        void _Set_Direction(TCA9548 multiplexerInstance);
-
-        void _ISR_execute_Angle(TCA9548 multiplexerInstance);    //Moving to assigned desired Angle                                                             (Angle mode)
-                                                                 //Execute in ISR (Interrupt Service Routine)
-                                                                 //Could include other functions according to demands 
-
-
+        Stepper(byte _ORDER, bool _rotateDirection);
+        void timerEnable(void);
+        void timerDisable(void);
+        void timerReEnable(void);
+        float getAngle();
+        void setRPM(float rpm);
+        void instructionExecution(queue<int> _numInterrupt, queue<float> _rpmQueue);
+        void setTimeStep(float timeStep);
+        void setAngle(float _desiredAngle);
+        void setDirection(bool direction);
+        void ISRAngleExecute();
+        void HomingISRAngleExecute();      
 };
 
-extern _Stepper_Motor Stepper;
-
-#endif  
+#endif

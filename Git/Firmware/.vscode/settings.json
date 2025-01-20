@@ -38,8 +38,9 @@
   "C_Cpp_Runner.compilerArgs": [],
   "C_Cpp_Runner.linkerArgs": [],
   "C_Cpp_Runner.includePaths": [
-    "C:/Users/FPTSHOP/Desktop/Project/3. Delta Robot Control Program/include",
-    "C:/Users/FPTSHOP/Desktop/Project/3. Delta Robot Control Program/src",
+    "C:/Users/FPTSHOP/Desktop/Project/4. Delta Robot software program/Delta Robot software program/include",
+    "C:/Users/FPTSHOP/Desktop/Project/4. Delta Robot software program/Delta Robot software program/src",
+    "C:/Users/FPTSHOP/Desktop/Project/4. Delta Robot software program/Delta Robot software program/.pio/libdeps/megaatmega2560/ArduinoSTL/src",
     "C:/Users/FPTSHOP/.platformio/packages/framework-arduino-avr/cores/arduino",
     "C:/Users/FPTSHOP/.platformio/packages/framework-arduino-avr/variants/mega",
     "C:/Users/FPTSHOP/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",

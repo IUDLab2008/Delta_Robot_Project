@@ -1,31 +1,42 @@
-//This file is intended for storing necessary datas, which are: Current position of End-effector; Desired angle of each invidual motor;
-//MMs per segment made; Boundaries of Angles and Angular velocities   
-
 #ifndef DATA_H
 #define DATA_H
 
-class _Data 
+struct element
 {
-    private:
-    public:
-        
-        float _current_x;                                                           //Store the current point coordinate
-        float _current_y;
-        float _current_z;
+    float element1;
+    float element2;
+    float element3;
 
-        float _desired_angle_1;                                                     //Store the desired point's angular position
-        float _desired_angle_2;
-        float _desired_angle_3;
-
-        float _MM_per_Segment;                                                      //Store the smallest line per segment (in MM)
-
-        int _angle_upper_bound;                                                     //Store the angular bounds and speed bounds
-        int _angle_lower_bound;
-        float _speed_upper_bound;
-        float _speed_lower_bound;
-     
+    float& get(int index)
+    {
+        switch (index)
+        {
+        case 0: return element1;
+        case 1: return element2;
+        case 2: return element3;
+        }
+    }
 };
 
-extern _Data Data;
+struct QueueSet
+{
+    queue<int> numInterruptQueue1;
+    queue<int> numInterruptQueue2;
+    queue<int> numInterruptQueue3;
 
-#endif 
+    queue<float> RPMQueue1;
+    queue<float> RPMQueue2;
+    queue<float> RPMQueue3;
+};
+
+class Data {
+    private:
+    public:
+        float currentX;
+        float currentY;
+        float currentZ;
+
+        float timeStep;
+};
+
+#endif

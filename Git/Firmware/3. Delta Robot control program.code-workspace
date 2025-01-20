@@ -1,0 +1,63 @@
+{
+	"folders": [
+		{
+			"name": "Delta Robot software program",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"queue": "cpp",
+			"utility": "cpp",
+			"cmath": "cpp",
+			"valarray": "cpp",
+			"deque": "cpp",
+			"list": "cpp",
+			"vector": "cpp",
+			"complex": "cpp",
+			"stack": "cpp",
+			"new": "cpp",
+			"algorithm": "cpp",
+			"array": "cpp",
+			"associative_base": "cpp",
+			"basic_definitions": "cpp",
+			"bitset": "cpp",
+			"cctype": "cpp",
+			"char_traits": "cpp",
+			"cstddef": "cpp",
+			"cstdio": "cpp",
+			"cstdlib": "cpp",
+			"cstring": "cpp",
+			"cwchar": "cpp",
+			"cwctype": "cpp",
+			"exception": "cpp",
+			"func_exception": "cpp",
+			"functional": "cpp",
+			"initializer_list": "cpp",
+			"iomanip": "cpp",
+			"ios": "cpp",
+			"iosfwd": "cpp",
+			"iostream": "cpp",
+			"istream": "cpp",
+			"istream_helpers": "cpp",
+			"iterator": "cpp",
+			"iterator_base": "cpp",
+			"limits": "cpp",
+			"locale": "cpp",
+			"map": "cpp",
+			"memory": "cpp",
+			"numeric": "cpp",
+			"ostream": "cpp",
+			"ostream_helpers": "cpp",
+			"serstream": "cpp",
+			"set": "cpp",
+			"sstream": "cpp",
+			"stdexcept": "cpp",
+			"streambuf": "cpp",
+			"string": "cpp",
+			"string_iostream": "cpp",
+			"type_traits": "cpp",
+			"typeinfo": "cpp"
+		}
+	}
+}

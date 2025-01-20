@@ -1,34 +1,25 @@
-//This function is intended to perform Interpolation, which parses the movement into smaller movements because of computational resources
-// and linearization for fine motion.
-
-
 #ifndef INTERPOLATION_H
 #define INTERPOLATION_H
 
-#include <math.h>
 #include "Kinematic.h"
+#include "Constant.h"
+#include "GCodeReceiver.h"
 #include "Data.h"
-#include "GCodeHandler.h"
 
-class _Interpolation
-{
+#include "ArduinoSTL.h"
+#include <vector>
+#include <queue>
+#include <array>
 
+using namespace std;
+
+class Interpolation {
     private:
-    struct _element
-    {
-        float _angle_1;
-        float _angle_2;
-        float _angle_3;
-    };
-
     public:
-
-        float _Distance(float _x_0, float _y_0, float _z_0, float _x_1, float _y_1, float _z_1);
-        bool _Linear_Interpolation(float _x_1, float _y_1, float _z_1);
-        bool _Circle_Interpolation(float x, float y, float _x_f, float _y_f, bool _rotating_direction);
-
+        float distanceBet2Point(float x0, float y0, float z0, float x1, float y1, float z1);
+        queue<element> linearInterpolation(Kinematic kinematicInstance, float x0, float y0, float z0, float x1, float y1, float z1);
+        queue<element> convert2AngularVelocities(GCodeReceiver& GCodeReceiverInstance, Kinematic kinematicInstance);
+        QueueSet convert2Angles(GCodeReceiver& GCodeReceiverInstance, Kinematic kinematicInstance);
 };
 
-extern _Interpolation Interpolation;
-
-#endif 
+#endif

@@ -1,112 +1,172 @@
 #include "Interpolation.h"
 
-
-float _Interpolation::_Distance(float _x_0, float _y_0, float _z_0, float _x_1, float _y_1, float _z_1)                     //Computing the distance (in MM) between (x0, y0, z0) and (x1, y1, z1)                                  
-{
-
-    return sqrt((_x_0 - _x_1) * (_x_0 - _x_1) + (_y_0 - _y_1) * (_y_0 - _y_1) + (_z_0 - _z_1) * (_z_0 - _z_1) );
-
+float Interpolation::distanceBet2Point(float _x_0, float _y_0, float _z_0, float _x_1, float _y_1, float _z_1) {
+    return sqrt(pow(_x_0 - _x_1, 2) + 
+                pow(_y_0 - _y_1, 2) + 
+                pow(_z_0 - _z_1, 2));
 }
 
-bool _Interpolation::_Linear_Interpolation(float _x_1, float _y_1, float _z_1)                                              //Perform Linear Interpolation, in which discretizes the path from current position to (x1, y1, z1)
-{                                                                                                                           //in to smaller parts. For each step, update the value of element [t][i] in _Segment
-    if ( !Kinematics._Check_Point_Validation(_x_1, _y_1, _z_1) )                                                            //Check whether given point is in predescribed workspace. If no, abort the function
-    {
-
-        return false;
-
-    }
-
-    int _Number_of_Segment = this -> _Distance(Data._current_x, Data._current_y, Data._current_z, _x_1, _y_1, _z_1) / Data._MM_per_Segment;        //Computing number of segments (steps to go) in the entire path
-
-    if ( _Number_of_Segment < 0.3 && _Number_of_Segment > -0.3 )                                                            //If the total step number is too small, abort the function                                                    
-    {
-
-        return false;
-
-    }
-
-    for (int i = 0; i <= _Number_of_Segment; i++)                                                                           //For each step, calcute the new desired angle values and update them in the _Segment
-    {
-        
-        float _buffer   = i / _Number_of_Segment;
-        float _x_buffer = (1 - _buffer) * Data._current_x + _buffer * _x_1;
-        float _y_buffer = (1 - _buffer) * Data._current_y + _buffer * _y_1;
-        float _z_buffer = (1 - _buffer) * Data._current_z + _buffer * _z_1;
-
-        float temp1 = 0;
-        float temp2 = 0;
-        float temp3 = 0;
-
-        Kinematics._Inverse_Kinematic(_x_buffer, _y_buffer, _z_buffer, temp1, temp2, temp3);
-
-        _element temp = {temp1, temp2, temp3}; 
-        _GCodeHandler._Segment.push(&temp);
-    }
-
-    return true;
-}
-
-bool _Interpolation::_Circle_Interpolation(float i, float j, float _x_f, float _y_f, bool _rotating_direction)              
-{
-
-    if (i == 0 && j == 0)                                                                                                   //If the reference center's relative coordinate w.r.t current position equals (0, 0), abort the function
-    {
-        return false;
-    }
-
-    float _radius = sqrt(i * i + j * j);                                                                                    //Compute the relative radius
-    float _o_x    = Data._current_x + i;                                                                                    //Compute the reference center's absolute XY-coordinate
-    float _o_y    = Data._current_y + j;
+queue<element> Interpolation::linearInterpolation(Kinematic kinematicInstance, 
+                                                float x0, float y0, float z0, 
+                                                float x1, float y1, float z1) 
+{   
+    queue<element> linearInterpolationQueue;
     
-
-    float _current_xy_angle = acosf(-i / _radius);                                                                          //Compute the relative angle between the line , which connects current position and reference center, and the x-axis
-    if (j > 0)
-    { 
-        _current_xy_angle = -_current_xy_angle;
-    }
-
-
-    float _desired_xy_angle = acosf((_x_f - _o_x) / _radius);                                                               //Compute the relative angle between the line , which connects desired position and reference center, and the x-axis
-    if (_y_f - _o_y <= 0)
+    if (!kinematicInstance.checkPointValidation(x1, y1, z1)) 
     {
-        _desired_xy_angle = -_desired_xy_angle;
+        linearInterpolationQueue.push({NAN, NAN, NAN});
+        return linearInterpolationQueue;
     }
 
-    float _Angular_Distance = _current_xy_angle - _desired_xy_angle;
-    if ( ( _Angular_Distance < 0.3 ) && ( _Angular_Distance > -0.3) )                                                       //If the Angular Distance is too small or equals to 0, assign the Angular Distance to Full-Round Travel
+    float distance = this->distanceBet2Point(x0, y0, z0, x1, y1, z1);
+    if (distance < 0.001f) 
     {
-        _Angular_Distance = _rotating_direction ? -2.0 * pi : 2.0 * pi;
+        linearInterpolationQueue.push({x1, y1, z1});
+        return linearInterpolationQueue;
     }
 
-    if ( (_current_xy_angle < _desired_xy_angle) && _rotating_direction)                
+    int segmentNum = ceil(distance / MM_PER_SEGMENT);
+
+    for (int i = 0; i <= segmentNum; i++) 
     {
-
+        float buffer = static_cast<float>(i) / segmentNum;
+        float xBuffer = (1 - buffer) * x0 + buffer * x1;
+        float yBuffer = (1 - buffer) * y0 + buffer * y1;
+        float zBuffer = (1 - buffer) * z0 + buffer * z1;
+        linearInterpolationQueue.push({xBuffer, yBuffer, zBuffer});
     }
-
-    float _number_of_arc_segment = _Angular_Distance * _radius / Data._MM_per_Segment;                                      //Compute the total of Segment made and Angular step per segment
-    int _number_of_segment = _Angular_Distance / _number_of_arc_segment;
-    float _Rad_per_Segment = Data._MM_per_Segment / _radius;
-
-
-    for (int t = 0; t <= _number_of_segment; t++)
-    {
-
-        float dx = Data._current_x * _radius * cos(_Rad_per_Segment) - Data._current_y * _radius * sin(_Rad_per_Segment);
-        float dy = Data._current_y * _radius * cos(_Rad_per_Segment) + Data._current_x * _radius * sin(_Rad_per_Segment);
-
-        float temp1 = 0;
-        float temp2 = 0;
-        float temp3 = 0;
-
-        Kinematics._Inverse_Kinematic(dx, dy, Data._current_z, temp1, temp2, temp3);                                        //For each step, calcute the new desired angle values and update them in the _Segment
-
-        _element temp = {temp1, temp2, temp3}; 
-        _GCodeHandler._Segment.push(&temp);
-    }
-
-    return true;
-
+    return linearInterpolationQueue;
 }
 
-_Interpolation Interpolation;
+queue<element> Interpolation::convert2AngularVelocities(GCodeReceiver& GCodeReceiverInstance, 
+                                                      Kinematic kinematicInstance) 
+{
+    queue<element> angularVelocitiesQueue;
+    
+    if (GCodeReceiverInstance.XValue.empty()) {
+        return angularVelocitiesQueue;  
+    }
+
+    float currentX = X_BASE;
+    float currentY = Y_BASE;
+    float currentZ = Z_BASE;
+    
+    while (!GCodeReceiverInstance.XValue.empty()) {
+        
+        float targetX = GCodeReceiverInstance.XValue.front();
+        float targetY = GCodeReceiverInstance.YValue.front();
+        float targetZ = GCodeReceiverInstance.ZValue.front();
+        float absoluteVelocity = GCodeReceiverInstance.FValue.front();
+        
+        GCodeReceiverInstance.XValue.pop();
+        GCodeReceiverInstance.YValue.pop();
+        GCodeReceiverInstance.ZValue.pop();
+        GCodeReceiverInstance.FValue.pop();
+
+        queue<element> pathSegments = this->linearInterpolation(
+            kinematicInstance, 
+            currentX, currentY, currentZ,
+            targetX, targetY, targetZ
+        );
+
+        if (!pathSegments.empty() && isnan(pathSegments.front().element1)) {
+            angularVelocitiesQueue.push({NAN, NAN, NAN});
+            return angularVelocitiesQueue;
+        }
+
+        float xDot, yDot, zDot;
+        kinematicInstance.calculateSubVelocities(
+            absoluteVelocity,
+            currentX, currentY, currentZ,
+            targetX, targetY, targetZ,
+            xDot, yDot, zDot
+        );
+
+        while (!pathSegments.empty()) 
+        {
+            element segment = pathSegments.front();
+            pathSegments.pop();
+            
+            element angularVelocity = kinematicInstance.calculateAngularVelocities(
+                segment.element1,
+                segment.element2,
+                segment.element3,
+                xDot, yDot, zDot
+            );
+            
+            angularVelocitiesQueue.push(angularVelocity);
+        }
+
+        currentX = targetX;
+        currentY = targetY;
+        currentZ = targetZ;
+    }
+
+    return angularVelocitiesQueue;
+}
+
+QueueSet Interpolation::convert2Angles(GCodeReceiver& GCodeReceiverInstance,
+                                                     Kinematic kinematicInstance)
+{
+    QueueSet resQueue;
+
+    if (GCodeReceiverInstance.XValue.empty()) {
+        return resQueue;  
+    }
+
+    float currentX = X_BASE;
+    float currentY = Y_BASE;
+    float currentZ = Z_BASE;
+
+    while(!GCodeReceiverInstance.XValue.empty())
+    {
+        float targetX = GCodeReceiverInstance.XValue.front();
+        float targetY = GCodeReceiverInstance.YValue.front();
+        float targetZ = GCodeReceiverInstance.ZValue.front();
+        float timeStep = GCodeReceiverInstance.timeStep.front();
+        
+        GCodeReceiverInstance.XValue.pop();
+        GCodeReceiverInstance.YValue.pop();
+        GCodeReceiverInstance.ZValue.pop();
+        GCodeReceiverInstance.timeStep.pop();
+
+        queue<element> pathSegments = this->linearInterpolation(
+            kinematicInstance, 
+            currentX, currentY, currentZ,
+            targetX, targetY, targetZ
+        );
+
+        float currentAngle1 = 0;
+        float currentAngle2 = 0;
+        float currentAngle3 = 0;
+
+        while(!pathSegments.empty())
+        {
+            float nextAngle1, nextAngle2, nextAngle3;
+            element segment = pathSegments.front();
+            pathSegments.pop();
+
+            kinematicInstance.inverseKinematic(
+                nextAngle1,
+                nextAngle2,
+                nextAngle3,
+                segment.element1,
+                segment.element2,
+                segment.element3
+                );
+
+            resQueue.numInterruptQueue1.push(ceil((nextAngle1 - currentAngle1) / DEGREE_PER_STEP) * 2);
+            resQueue.numInterruptQueue2.push(ceil((nextAngle2 - currentAngle2) / DEGREE_PER_STEP) * 2);
+            resQueue.numInterruptQueue3.push(ceil((nextAngle3 - currentAngle3) / DEGREE_PER_STEP) * 2);
+            
+            resQueue.RPMQueue1.push(resQueue.numInterruptQueue1.back() / timeStep);
+            resQueue.RPMQueue2.push(resQueue.numInterruptQueue2.back() / timeStep);
+            resQueue.RPMQueue3.push(resQueue.numInterruptQueue3.back() / timeStep);
+
+            currentAngle1 = nextAngle1;
+            currentAngle2 = nextAngle2;
+            currentAngle3 = nextAngle3;
+        }
+    }
+    return resQueue;
+}
