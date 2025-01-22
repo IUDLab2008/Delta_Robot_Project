@@ -2,6 +2,7 @@
 #include "SerialCommunication.h"
 #include "GCodeReceiver.h"
 #include "Interpolation.h"
+#include "Data.h"
 
 Stepper stepperMotor1(0, true);
 Stepper stepperMotor2(1, true);
@@ -11,6 +12,7 @@ UART uartInstance(MYUBRR);
 
 GCodeReceiver gCodeReceiverInstance;
 queue<String> instructionSet;
+Data dataInstance;
 
 Interpolation interpolationInstance;
 Kinematic kinematicInstance;
@@ -23,33 +25,52 @@ ISR(USART0_TX_vect)
   gCodeReceiverInstance.parseInstruction(instructionSet);
 
   queueRes = interpolationInstance.convert2Angles(gCodeReceiverInstance, kinematicInstance);
-
-  stepperMotor1.instructionExecution(queueRes.numInterruptQueue1, queueRes.RPMQueue1);
-  stepperMotor2.instructionExecution(queueRes.numInterruptQueue2, queueRes.RPMQueue2);
-  stepperMotor3.instructionExecution(queueRes.numInterruptQueue3, queueRes.RPMQueue3);
 }
 
 ISR(TIMER1_COMPA_vect)
 {
-  stepperMotor3.HomingISRAngleExecute();
-  stepperMotor3.ISRAngleExecute();
+  if (stepperMotor3.getIsHoming())
+  {  
+    stepperMotor3.HomingISRAngleExecute();
+  } else {
+    stepperMotor3.ISRAngleExecute();
+  }
 }
 
 ISR(TIMER3_COMPA_vect)
 {
-  stepperMotor2.HomingISRAngleExecute();
-  stepperMotor2.ISRAngleExecute();
+  if (stepperMotor2.getIsHoming())
+  {  
+    stepperMotor2.HomingISRAngleExecute();
+  } else {
+    stepperMotor2.ISRAngleExecute();
+  }
 }
 
 ISR(TIMER4_COMPA_vect)
 {
-  stepperMotor1.HomingISRAngleExecute();
-  stepperMotor1.ISRAngleExecute();
+  if (stepperMotor1.getIsHoming())
+  {  
+    stepperMotor1.HomingISRAngleExecute();
+  } else {
+    stepperMotor1.ISRAngleExecute();
+  }
 }
 
+ISR(TIMER5_COMPA_vect)
+{
+  sei();
+  
+  dataInstance.timeWatcher(queueRes);
+  stepperMotor1.setRPM(queueRes.RPMQueue1.front());
+  stepperMotor2.setRPM(queueRes.RPMQueue2.front());
+  stepperMotor3.setRPM(queueRes.RPMQueue3.front());
+}
 
 void setup() {
   uartInstance.UARTFlush();
+
+  dataInstance.setUpTimeWatcher();
 
   stepperMotor1.timerEnable();
   stepperMotor1.setRPM(HOMING_RPM);
@@ -59,6 +80,18 @@ void setup() {
 
   stepperMotor3.timerEnable();
   stepperMotor3.setRPM(HOMING_RPM);
+
+  while (stepperMotor1.getIsHoming() || stepperMotor2.getIsHoming() || stepperMotor3.getIsHoming() || !uartInstance.getEndOfTransmission())
+  {
+    ;
+  }
+
+  dataInstance.setTimeWatcherValue(queueRes.timeStep.front());
+  stepperMotor1.setRPM(queueRes.RPMQueue1.front());
+  stepperMotor2.setRPM(queueRes.RPMQueue2.front());
+  stepperMotor3.setRPM(queueRes.RPMQueue3.front());
+
+  sei();
 }
 
 void loop() {

@@ -2,6 +2,13 @@
 
 Stepper::Stepper (byte _ORDER, bool _rotateDirection)
 {
+    /*
+        Summary:
+            This constructor function initializes the Motor with specifications
+        Args:
+            _ORDER: The order of the Motor, i.e     0 <-> 1st Motor
+            _rotateDirection: The default rotating Direction of the Motor.
+    */
     this -> mode = MODE;
     this -> stepPerRev = STEP;
     this -> angularResolution = ANGULAR_RESOLUTION;
@@ -49,6 +56,13 @@ Stepper::Stepper (byte _ORDER, bool _rotateDirection)
 
 void Stepper::timerEnable(void)
 {
+    /*
+        Summary:
+            This function set-up Timer with CTC mode configuration but not yet set-up the TOP value to 
+            temporarily pause the activity of the Timer
+        Args:
+            None
+    */
     pinMode(this -> STEP_PIN, OUTPUT);
     this -> isRunning = 1;
     switch (this -> order)
@@ -98,6 +112,12 @@ void Stepper::timerEnable(void)
 
 void Stepper::timerDisable(void)
 {
+    /*
+        Summary:
+            This function temporarily disable the Timer output action by simply disable the corresponding output pin configuration
+        Args:
+            None
+    */
     switch (this -> order)
     {
     case 0:
@@ -116,7 +136,13 @@ void Stepper::timerDisable(void)
 }
 
 void Stepper::timerReEnable(void)
-{
+{   
+    /*
+        Summary:
+            This function re-enable the Timer output action by simply enable the corresponding output pin configuration
+        Args:
+            None
+    */
     switch (this -> order)
     {
     case 0:
@@ -134,9 +160,16 @@ void Stepper::timerReEnable(void)
     this -> isRunning = 1;
 }
 
-void Stepper::setRPM(float rpm)
+void Stepper::setRPM(float _rpm)
 {
-    int COUNTER_TOP = ceil(( ( 16e6 * 60 / (8L * rpm  * this -> mode * this -> stepPerRev) ) - 1 ) / 4);
+    /*
+        Summary:
+            This function configures the RPM of the Motor by adjust the TOP Value for Timer matching.
+            Also, this adjust the rotating direction accordingly.
+        Args:
+            None
+    */
+    int COUNTER_TOP = ceil(( ( 16e6 * 60 / (8L * _rpm  * this -> mode * this -> stepPerRev) ) - 1 ) / 4);
     switch (this -> order)
     {
     case 0:
@@ -151,6 +184,28 @@ void Stepper::setRPM(float rpm)
         ICR1 = COUNTER_TOP;
         break;
     }
+
+    this -> rpm = _rpm;
+
+    if ( _rpm > 0 )
+    {
+        if (!this -> rotateDirection)
+        {
+            digitalWrite(this -> DIR_PIN, HIGH);                                                        
+        } else {
+            digitalWrite(this -> DIR_PIN, LOW);                                                        
+        }
+
+    } else {
+
+        if (!this -> rotateDirection)
+        {
+            digitalWrite(this -> DIR_PIN, LOW);                                                        
+        } else {
+            digitalWrite(this -> DIR_PIN, HIGH);                                                        
+        }
+
+    }     
 }
 
 void Stepper::setAngle(float _desiredAngle)
@@ -159,53 +214,43 @@ void Stepper::setAngle(float _desiredAngle)
     this -> timerReEnable();
 }
 
-void Stepper::ISRAngleExecute()
-{
-    if (!this -> numInterrupt.empty() && !this -> isHoming)
-    {
-        if (this -> rotateDirection)
-        {
-            this -> ellapsedInterrupt --;
-        } else {
-            this -> ellapsedInterrupt ++;
-        }
-
-        if (abs(this -> ellapsedInterrupt) >= numInterrupt.front())
-        {
-            this -> ellapsedInterrupt = 0;
-            
-            this -> numInterrupt.pop();
-            this -> rpmQueue.pop();
-            
-            if (!this -> numInterrupt.empty())
-            {
-                this -> setRPM(this -> rpmQueue.front());
-            } else {
-                this -> timerDisable();
-            }
-        }
-    }
-}
-
 void Stepper::HomingISRAngleExecute()
 {   
-    if (this -> isHoming == 1)
+    /*
+        Summary:
+            This function handles the first-time Homing procedure of the Motor by moving at predefined HOMING_RPM
+            until the angle is between (-angularResolution/2, angularResolution/2) then clear the Homing State flag 
+            to indicate Homing is over.
+        Args:
+            None
+    */
+    if (std::abs(analogRead(this -> ENCODER_PIN) * RAW_TO_ANGLE) < this -> angularResolution)
     {
-        if (abs(analogRead(this -> ENCODER_PIN) * RAW_TO_ANGLE) < this -> angularResolution)
+        this -> timerDisable();
+        this -> isHoming = 0;
+    }
+}
+
+void Stepper::ISRAngleExecute()
+{
+    /*
+        Summary:
+            This function update the ellapsed steps made since the beginning of GCode processing.
+        Args:
+            None
+    */
+    if (this -> rpm)
+    {
+        if (this -> rpm > 0)
         {
-            this -> timerDisable();
-            this -> isHoming == 0;
+            this -> ellapsedInterrupt ++;
+        } else {
+            this -> ellapsedInterrupt --;
         }
     }
 }
 
-void Stepper::instructionExecution(queue<int> _numInterrupt, queue<float> _rpmQueue)
+inline float Stepper::getAngle() const noexcept
 {
-    this -> numInterrupt = _numInterrupt;
-    this -> rpmQueue = _rpmQueue;
-}
-
-float Stepper::getAngle()
-{
-    return analogRead(this -> ENCODER_PIN) * RAW_TO_ANGLE;
+    return this -> ellapsedInterrupt * RAW_TO_ANGLE;
 }

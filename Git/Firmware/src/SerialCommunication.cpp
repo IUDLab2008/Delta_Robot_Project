@@ -16,7 +16,7 @@ UART::UART(unsigned int baudRate)
 
 }
 
-void UART::UARTFlush()
+void UART::UARTFlush() const
 {
     unsigned char dummy;
     while ( UCSR0A & ( 1 << RXC0 ) )
@@ -34,7 +34,7 @@ void UART::UARTTransmit(unsigned char data)
     UDR0 = data; 
 }
 
-unsigned char UART::UARTReceive(void)                                                                          
+unsigned char UART::UARTReceive (void) const                                                                         
 {
     while ( !( UCSR0A & ( 1 << RXC0 ) ) )
     {
@@ -85,5 +85,6 @@ void UART::ISRInstructionHandle(queue<String>& instructionSet, GCodeReceiver GCo
                 }
         }
     }
+    this -> endOfTransmission = 1;
 }
 

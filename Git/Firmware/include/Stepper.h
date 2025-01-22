@@ -8,6 +8,7 @@
 #include "PinOut.h"
 #include "Data.h"
 #include <queue>
+#include <cmath>
 
 using namespace std;
 
@@ -28,8 +29,6 @@ class Stepper {
             angleOffset:     Offset of feedback encoder due to mouting
             isRunning :      Store the operating state of Motor
             ellapsedInterrupt: Store the ellapsed number of Interrupt 
-            numInterrupt:    Store the number of Interrupt after fetching GCode
-            rpmQueue:        Store the angular velocities after fetching GCode
     */
 
         bool rotateDirection;  
@@ -42,28 +41,25 @@ class Stepper {
         byte ENCODER_PIN;
         float angularResolution;
         float angleOffset;
-        bool isRunning;
-        bool isHoming = 1;
-
-        int ellapsedInterrupt = 0;
-        queue<int> numInterrupt;
-        queue<float> rpmQueue;
-
-        float desiredAngle = 0;
+        volatile bool isRunning = 0;
+        volatile float rpm = HOMING_RPM;
+        volatile int ellapsedInterrupt = 0;
+        volatile float desiredAngle = 0;
+        volatile bool isHoming = 1;
 
     public:
-        Stepper(byte _ORDER, bool _rotateDirection);
+        Stepper(const byte _ORDER, const bool _rotateDirection);
         void timerEnable(void);
-        void timerDisable(void);
-        void timerReEnable(void);
-        float getAngle();
-        void setRPM(float rpm);
-        void instructionExecution(queue<int> _numInterrupt, queue<float> _rpmQueue);
-        void setTimeStep(float timeStep);
-        void setAngle(float _desiredAngle);
-        void setDirection(bool direction);
-        void ISRAngleExecute();
-        void HomingISRAngleExecute();      
+        inline void timerDisable(void);
+        inline void timerReEnable(void);
+        inline float getAngle() const noexcept;
+        inline void setRPM(const float rpm);
+        bool getIsHoming() const { return isHoming; }
+        inline void setTimeStep(const float timeStep);
+        void setAngle(const float _desiredAngle);
+        void setDirection(const bool direction);
+        inline void ISRAngleExecute();
+        inline void HomingISRAngleExecute();      
 };
 
 #endif

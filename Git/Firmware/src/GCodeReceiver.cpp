@@ -1,6 +1,6 @@
 #include "GCodeReceiver.h"
 
-bool GCodeReceiver::validateInstruction(String instruction)
+bool GCodeReceiver::validateInstruction(String instruction) const
 {
     if (!instruction.length())
     {
@@ -71,7 +71,7 @@ void GCodeReceiver::parseInstruction(queue<String>& instructionQueue)
         }
         if (!FIdentifier && !this -> key.back())
         {
-            this -> FValue.push(SPEED_UPPER_BOUND);
+            this -> FValue.push((this -> FValue.back() > 0) ? -SPEED_UPPER_BOUND : SPEED_UPPER_BOUND);
         } else if (!FIdentifier && this -> key.back())
         {
             this -> FValue.push(this -> FValue.back());

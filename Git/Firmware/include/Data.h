@@ -1,6 +1,8 @@
 #ifndef DATA_H
 #define DATA_H
 
+#include "Arduino.h"
+
 struct element
 {
     float element1;
@@ -20,9 +22,7 @@ struct element
 
 struct QueueSet
 {
-    queue<int> numInterruptQueue1;
-    queue<int> numInterruptQueue2;
-    queue<int> numInterruptQueue3;
+    queue<float> timeStep;
 
     queue<float> RPMQueue1;
     queue<float> RPMQueue2;
@@ -32,11 +32,21 @@ struct QueueSet
 class Data {
     private:
     public:
+    /*
+        Args:
+            currentX:   Store the current X coordinate of the End-Effector
+            currentY:   Store the current Y coordinate of the End-Effector
+            currentZ:   Store the current Z coordinate of the End-Effector
+            timeStep:   Store the current time needed to fully execute the first element in QueueSet
+    */
         float currentX;
         float currentY;
         float currentZ;
 
         float timeStep;
+        void setUpTimeWatcher();
+        void setTimeWatcherValue(float timeStep);
+        void timeWatcher(QueueSet& queueT);
 };
 
 #endif

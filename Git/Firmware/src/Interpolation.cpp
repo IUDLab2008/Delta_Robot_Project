@@ -1,6 +1,7 @@
 #include "Interpolation.h"
 
-float Interpolation::distanceBet2Point(float _x_0, float _y_0, float _z_0, float _x_1, float _y_1, float _z_1) {
+float Interpolation::distanceBet2Point(float _x_0, float _y_0, float _z_0, float _x_1, float _y_1, float _z_1) const
+{
     return sqrt(pow(_x_0 - _x_1, 2) + 
                 pow(_y_0 - _y_1, 2) + 
                 pow(_z_0 - _z_1, 2));
@@ -154,14 +155,12 @@ QueueSet Interpolation::convert2Angles(GCodeReceiver& GCodeReceiverInstance,
                 segment.element2,
                 segment.element3
                 );
-
-            resQueue.numInterruptQueue1.push(ceil((nextAngle1 - currentAngle1) / DEGREE_PER_STEP) * 2);
-            resQueue.numInterruptQueue2.push(ceil((nextAngle2 - currentAngle2) / DEGREE_PER_STEP) * 2);
-            resQueue.numInterruptQueue3.push(ceil((nextAngle3 - currentAngle3) / DEGREE_PER_STEP) * 2);
             
-            resQueue.RPMQueue1.push(resQueue.numInterruptQueue1.back() / timeStep);
-            resQueue.RPMQueue2.push(resQueue.numInterruptQueue2.back() / timeStep);
-            resQueue.RPMQueue3.push(resQueue.numInterruptQueue3.back() / timeStep);
+            resQueue.RPMQueue1.push((nextAngle1 - currentAngle1) / timeStep / 360.0 * 60.0);
+            resQueue.RPMQueue2.push((nextAngle2 - currentAngle2) / timeStep / 360.0 * 60.0);
+            resQueue.RPMQueue3.push((nextAngle3 - currentAngle3) / timeStep / 360.0 * 60.0);
+
+            resQueue.timeStep.push(timeStep);
 
             currentAngle1 = nextAngle1;
             currentAngle2 = nextAngle2;

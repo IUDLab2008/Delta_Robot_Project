@@ -20,11 +20,10 @@
 #define cTerm ((wP - wB) / 2.0)
 
 #define SPEED_UPPER_BOUND 30
-#define SPEED_LOWER_BOUND 5
 #define ANGLE_UPPER_BOUND 120
 #define ANGLE_LOWER_BOUND -30
 
-#define HOMING_RPM 10
+#define HOMING_RPM -10.0
 
 #define DEGREE_PER_STEP (1.0/5480.0)
 
@@ -48,8 +47,6 @@
 #define MM_PER_SEGMENT 1
 #define DEGREE_PER_SEGMENT 1
 #define ANGULAR_RESOLUTION 1
-
-#define GCODESIZE 1
 
 #define FOSC 16000000UL
 #define BAUD 9600
