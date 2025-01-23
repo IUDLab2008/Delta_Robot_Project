@@ -47,10 +47,6 @@ class Dynamic_System(nn.Module):
         sub_net_params.extend(list(self.Mass_NNs.parameters()))
         sub_net_params.extend(list(self.Gravity_NNs.parameters()))
         sub_net_params.extend(list(self.KBA_Term.parameters()))
-
-        # Convert sub-network parameters to be part of Dynamic_System parameters
-        for i, param in enumerate(sub_net_params):
-            self.register_parameter(f'sub_net_param_{i}', param)
                 
                 
     def Auxiliary_Calculation(self, q, s, s_Ddot):

@@ -28,22 +28,21 @@ class KFoldTraining:
             train_loader: Training dataset
             dynamic_system: Dynamic System instance
         """
-
         dynamic_system.train()
         epoch_loss = 0.0
         
         for batch in train_loader:
             #---Loading data in each batch---#
-            q = batch['theta'].to(self.device)
-            q_dot = batch['theta_dot'].to(self.device)
-            s = batch['s'].to(self.device)
-            s_Ddot = batch['s_Ddot'].to(self.device)
-            tau = batch['tau'].to(self.device)
-            u_t_1 = batch['theta_Ddot'].to(self.device).to(torch.float32)
+            q = batch['theta'].to(self.device).float()
+            q_dot = batch['theta_dot'].to(self.device).float()
+            s = batch['s'].to(self.device).float()
+            s_dot = batch['s_dot'].to(self.device).float()
+            tau = batch['tau'].to(self.device).squeeze().float()
+            t = batch['t'].to(self.device).float()
                         
             optimizer.zero_grad()
-            q_Ddot_pred = dynamic_system(q, q_dot, s, s_Ddot, tau)
-            loss = self.criterion(q_Ddot_pred, u_t_1)
+            tau_pred = dynamic_system(q, q_dot, s, s_dot, t)
+            loss = self.criterion(tau_pred, tau)
             loss.backward(retain_graph=True)
             optimizer.step()
             epoch_loss += loss.item()
@@ -64,19 +63,18 @@ class KFoldTraining:
         with torch.no_grad():
             for batch in val_loader:
                 # Move batch data to device
-                q = batch['theta'].to(self.device)
-                q_dot = batch['theta_dot'].to(self.device)
-                s = batch['s'].to(self.device)
-                s_Ddot = batch['s_Ddot'].to(self.device)
-                tau = batch['tau'].to(self.device)
-                u_t_1 = batch['theta_Ddot'].to(self.device).to(torch.float32)
+                q = batch['theta'].to(self.device).float()
+                q_dot = batch['theta_dot'].to(self.device).float()
+                s = batch['s'].to(self.device).float()
+                s_dot = batch['s_dot'].to(self.device).float()
+                tau = batch['tau'].to(self.device).squeeze().float()
+                t = batch['t'].to(self.device).float()
                 
-                q_Ddot_pred = dynamic_system(q, q_dot, s, s_Ddot, tau)
-                loss = self.criterion(q_Ddot_pred, u_t_1)
+                tau_pred = dynamic_system(q, q_dot, s, s_dot, t)
+                loss = self.criterion(tau_pred, tau)
                 val_loss += loss.item()
                 
         return val_loss / len(val_loader)
-    
     
         
     def train(self, epochs , batch_size , learning_rate):
@@ -110,7 +108,7 @@ class KFoldTraining:
             #---Define optimizer to optimize all sub-network parameters---#
             dynamic_system = self.dynamic_system_instance.to(self.device)
             optimizer = torch.optim.Adam(dynamic_system.parameters(), lr = learning_rate)
-            
+                        
             #---Loop over given epochs---#
             for epoch in range(epochs):
                 

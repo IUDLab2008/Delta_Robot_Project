@@ -224,7 +224,7 @@ void Stepper::HomingISRAngleExecute()
         Args:
             None
     */
-    if (std::abs(analogRead(this -> ENCODER_PIN) * RAW_TO_ANGLE) < this -> angularResolution)
+    if (std::abs(analogRead(this -> ENCODER_PIN) * RAW_TO_ANGLE - this -> angleOffset) < this -> angularResolution)
     {
         this -> timerDisable();
         this -> isHoming = 0;

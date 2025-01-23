@@ -71,7 +71,7 @@ void GCodeReceiver::parseInstruction(queue<String>& instructionQueue)
         }
         if (!FIdentifier && !this -> key.back())
         {
-            this -> FValue.push((this -> FValue.back() > 0) ? -SPEED_UPPER_BOUND : SPEED_UPPER_BOUND);
+            this -> FValue.push((this -> FValue.back() >= 0) ? -SPEED_UPPER_BOUND : SPEED_UPPER_BOUND);
         } else if (!FIdentifier && this -> key.back())
         {
             this -> FValue.push(this -> FValue.back());

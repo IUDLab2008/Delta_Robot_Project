@@ -1,110 +1,123 @@
-"""
-Module Name: Model Builder
-
-Purpose:
-    This module provides simple training method:
-        In which it loads datas via MatDataLoader, then, divides it into smaller batches of training data and validate data
-        __train_epoch() performs simple optimizer step: calculate loss for training data and back-propagate
-        __val_epoch() performs simple optimizer step: calculate loss for training data and back-propagate
-    This module also provides K-Fold Cross Validation
-"""
-
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader, Subset
 from sklearn.model_selection import KFold
-from torch.utils.data import Subset
 import numpy as np
-from torch.utils.data import DataLoader, Dataset
-from dataloader import MatDataLoader
-from DeLan import Dynamic_System
 
 
-class Simple_Training(Dynamic_System):
-    def __init__(self,training_data,validate_data = None, training_batch, criterion = nn.MSELoss()):
-        self.training_data = training_data
-        self.validate_data = validate_data
-        self.training_batch = training_data
+class KFoldTraining:
+    def __init__(self, device, dataset, k_folds, dynamic_system_instance = None, criterion = nn.MSELoss()):
+        """
+        Args:
+            dataset (Dataset): The dataset object (e.g., MatDataLoader) to use for training and validation.
+            k_folds (int): The number of folds for cross-validation.
+            criterion (torch.nn.Module): The loss function to use during training.
+            dynamic_system_instance: Instance of Dynamic_System Class which is composed of M, G, B, F_v, F_c Networks
+        """
+        self.dataset = dataset
+        self.k_folds = k_folds
         self.criterion = criterion
+        self.dynamic_system_instance = dynamic_system_instance
+        self.device = device
         
-    def training(self,model,device,optimizer,num_epochs=1,batch = 1,visualize = 1):
-        train_loss = 0.0
-        val_loss = 0.0
-        for epoch in range(num_epochs):
-            training_data = MatDataLoader(training_directory = "", data_length = )
-            train_dataloader = DataLoader(training_data, batch_size = 64, shuffle = True)
-            
-            val_data = MatDataLoader(validation_directory = "", data_length = )
-            val_dataloader = DataLoader(val_data, batch_size = 1, shuffle = True)
-            
-            train_loss = self.__train_epoch(model, device, self.criterion, train_dataloader, optimizer)
-            val_loss = self.__val_epoch(model, device, self.criterion, val_dataloader)
-            print('Iteration: {}/{}. loss_train: {}. loss_val: {}'.format(epoch+1, num_epochs,train_loss, val_loss))
-            
-    def __train_epoch(self, model, device, loss_fn, data, optimizer):
-        train_loss = 0.0
-        model.train()
-        for inputs, labels in data:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+    def __train_epoch(self, train_loader, dynamic_system, optimizer):
+        """
+        Perform training over number of given epochs in training dataset
+
+        Args:
+            train_loader: Training dataset
+            dynamic_system: Dynamic System instance
+        """
+        dynamic_system.train()
+        epoch_loss = 0.0
+        
+        for batch in train_loader:
+            #---Loading data in each batch---#
+            q = batch['theta'].to(self.device)
+            q_dot = batch['theta_dot'].to(self.device)
+            s = batch['s'].to(self.device)
+            s_Ddot = batch['s_Ddot'].to(self.device)
+            tau = batch['tau'].to(self.device)
+            u_t_1 = batch['theta_Ddot'].to(self.device).to(torch.float32)
+                        
             optimizer.zero_grad()
-            outputs = model(inputs)                 #need to be modified
-            loss = loss_fn(outputs,labels)
-            loss.backward()
+            q_Ddot_pred = dynamic_system(q, q_dot, s, s_Ddot, tau)
+            loss = self.criterion(q_Ddot_pred, u_t_1)
+            loss.backward(retain_graph=True)
             optimizer.step()
-            train_loss += loss.cpu().detach().numpy()
-        train_loss = train_loss / len(data)
-        return train_loss 
+            epoch_loss += loss.item()
+        return epoch_loss / len(train_loader)
+    
+    
 
-    def __val_epoch(self,model, device, loss_fn, data):
+    def __val_epoch(self, val_loader, dynamic_system, optimizer):
+        """
+        Perform validation for one epoch
+        Args:
+            val_loader: Validation dataset loader
+            dynamic_system: Dynamic System instance
+        """
+        dynamic_system.eval()
         val_loss = 0.0
-        model.eval()
-        total_labels = []
-        total_ouputs = []
+        
         with torch.no_grad():
-            for inputs, labels in data:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-                outputs = model(inputs)
-                loss = loss_fn(outputs,labels)
-                val_loss += loss.cpu().detach().numpy()
-                total_labels.append(labels[0])
-                total_ouputs.append(outputs[0])
-            val_loss = val_loss / len(data)
-        return val_loss
+            for batch in val_loader:
+                # Move batch data to device
+                q = batch['theta'].to(self.device)
+                q_dot = batch['theta_dot'].to(self.device)
+                s = batch['s'].to(self.device)
+                s_Ddot = batch['s_Ddot'].to(self.device)
+                tau = batch['tau'].to(self.device)
+                u_t_1 = batch['theta_Ddot'].to(self.device).to(torch.float32)
+                
+                q_Ddot_pred = dynamic_system(q, q_dot, s, s_Ddot, tau)
+                loss = self.criterion(q_Ddot_pred, u_t_1)
+                val_loss += loss.item()
+                
+        return val_loss / len(val_loader)
+    
+    
+        
+    def train(self, epochs , batch_size , learning_rate):
+        """
+        Perform training over number of given epochs
 
+        Args:
+            model: Passed-in DeLan model
+            optimizer: The optimizer to use
+            epochs: Total number of epochs
+            batch_size: Size of each batch
+        """
+        #---Initialize splitting into given k_folds sections---#
+        kfold = KFold(n_splits=self.k_folds, shuffle=True)
+                
+        #---Iterating over splitted folds---#
+        for fold, (train_ids, val_ids) in enumerate(kfold.split(range(len(self.dataset)))):
+            
+            print(f'\nFold {fold + 1}/{self.k_folds}')
+            print(f'Training size: {len(train_ids)}, Validation size: {len(val_ids)}')
+            print('-' * 50)
+            
+            #---Deduct indexes for training and validation---#
+            train_subsampler = Subset(self.dataset, train_ids)
+            val_subsampler = Subset(self.dataset, val_ids)
+            
+            #---Loading training and validation set for resulted indexes---#
+            train_loader = DataLoader(train_subsampler, batch_size = batch_size, shuffle=True)
+            val_loader = DataLoader(val_subsampler, batch_size = batch_size, shuffle=False)
+            
+            #---Define optimizer to optimize all sub-network parameters---#
+            dynamic_system = self.dynamic_system_instance.to(self.device)
+            optimizer = torch.optim.Adam(dynamic_system.parameters(), lr = learning_rate)
+                        
+            #---Loop over given epochs---#
+            for epoch in range(epochs):
+                
+                train_loss = self.__train_epoch(train_loader, dynamic_system, optimizer)
+                val_loss = self.__val_epoch(val_loader, dynamic_system, optimizer)
 
-class k_fold_training:
-    __fold = None
-    def __init__(self,train_data,k,criterion = nn.MSELoss()):
-        self.train_data = train_data
-        self.k = k
-        if self.k > 1:
-            self.fold_gen(True, 8386)
-
-    def fold_gen(self,shuff,r_state):
-        if self.k > 1:
-            splits = KFold(n_splits=self.k,shuffle=shuff,random_state=r_state)
-            self.__fold = splits.split(self.train_data)
-
-    def training(self,model,device,optimizer,num_epochs=1,batch = 1,visualize = 1):
-        if self.k > 1:
-            actor = Simple_Training(self.train_data)
-            for fold, (train_idx,val_idx) in enumerate(self.__fold):
-                fmodel = model.to(device)
-                for layer in fmodel.children():
-                    if hasattr(layer, 'reset_parameters'):
-                        layer.reset_parameters()
-
-                if (visualize == 1):
-                    print("Fold :",fold+1)
-                    print("Train and validate dataset are overlap: ",any(x in val_idx for x in train_idx))
-                actor.training_data = Subset(self.train_data, train_idx)
-                actor.validate_data = Subset(self.train_data, val_idx)
-                actor.training(model,device,optimizer,num_epochs,batch,visualize)
-
-        else:
-            model.to(device)
-            print(next(model.parameters()).is_cuda)
-            actor = Simple_Training(self.train_data, criterion=self.criterion)
-            actor.training_data = self.train_data
-            actor.training(model,device,optimizer,num_epochs,batch,visualize)
+                print(f"Epoch {epoch + 1}/{epochs}, Train Loss: {train_loss:.6f}, Val Loss: {val_loss:.6f}")
+                print(f"f_v1: {dynamic_system.f_v1.item()}, f_v2: {dynamic_system.f_v2.item()}, f_v3: {dynamic_system.f_v3.item()}")
+                print(f"f_c1: {dynamic_system.f_c1.item()}, f_c2: {dynamic_system.f_c2.item()}, f_c3: {dynamic_system.f_c3.item()}")
+                print('-' * 50)
+            
