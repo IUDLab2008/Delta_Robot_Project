@@ -33,16 +33,18 @@ class KFoldTraining:
         
         for batch in train_loader:
             #---Loading data in each batch---#
-            q = batch['theta'].float()
-            q_dot = batch['theta_dot'].float()
-            s = batch['s'].float()
-            s_dot = batch['s_dot'].float()
-            tau = batch['tau'].squeeze().float().to(self.device)
-            t = batch['t'].float()
+            q = batch['theta'].float().to(self.device)
+            q_dot = batch['theta_dot'].float().to(self.device)
+            q_Ddot = batch['theta_Ddot'].float().to(self.device)
+            s = batch['s'].float().to(self.device)
+            s_dot = batch['s_dot'].float().to(self.device)
+            s_Ddot = batch['s_Ddot'].float().to(self.device)
+            tau = batch['tau'].float().to(self.device)
                         
+            z = s[:, 2:3]
             optimizer.zero_grad()
-            tau_pred = dynamic_system(q, q_dot, s, s_dot, t)
-            loss = self.criterion(tau_pred, tau)
+            q_Ddot_pred = dynamic_system(q_dot, s_dot, q, z, s, s_Ddot, tau)
+            loss = self.criterion(q_Ddot_pred, q_Ddot)
             loss.backward(retain_graph=True)
             optimizer.step()
             epoch_loss += loss.item()
@@ -62,16 +64,17 @@ class KFoldTraining:
         
         with torch.no_grad():
             for batch in val_loader:
-                # Move batch data to device
-                q = batch['theta'].float()
-                q_dot = batch['theta_dot'].float()
-                s = batch['s'].float()
-                s_dot = batch['s_dot'].float()
-                tau = batch['tau'].squeeze().float().to(self.device)
-                t = batch['t'].float()
-                
-                tau_pred = dynamic_system(q, q_dot, s, s_dot, t)
-                loss = self.criterion(tau_pred, tau)
+                q = batch['theta'].float().to(self.device)
+                q_dot = batch['theta_dot'].float().to(self.device)
+                q_Ddot = batch['theta_Ddot'].float().to(self.device)
+                s = batch['s'].float().to(self.device)
+                s_dot = batch['s_dot'].float().to(self.device)
+                s_Ddot = batch['s_Ddot'].float().to(self.device)
+                tau = batch['tau'].float().to(self.device)
+                            
+                z = s[:, 2:3]
+                q_Ddot_pred = dynamic_system(q_dot, s_dot, q, z, s, s_Ddot, tau)
+                loss = self.criterion(q_Ddot_pred, q_Ddot)
                 val_loss += loss.item()
                 
         return val_loss / len(val_loader)

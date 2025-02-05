@@ -56,22 +56,13 @@ class MatDataLoader(Dataset):
         return len(self.theta)
     
     def __getitem__(self, index):
-        return {
-                #"t": self.t[index : index + 1, :],
-                #"theta": self.theta[index : index + 1, :],
-                #"theta_dot": self.theta_dot[index : index + 1, :],
-                #"theta_Ddot": self.theta_Ddot[index : index + 1, :],
-                #"s": self.s[index : index + 1, :],
-                #"s_Ddot": self.s_Ddot[index : index + 1, :],
-                #"tau": self.tau[index : index + 1, :],
-                
+        return {                
                 "theta": self.theta[index],
                 "theta_dot": self.theta_dot[index],
                 "theta_Ddot": self.theta_Ddot[index],
                 "s": self.s[index],
                 "s_Ddot": self.s_Ddot[index],
-                "tau": self.tau[index],
-                
+                "tau": self.tau[index],      
                 }
         
     

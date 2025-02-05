@@ -29,55 +29,71 @@ def T_Derivative(
             T_NNsInstance: An instance of Total Kinetic Energy Neural Network (T_NNs) with a forward method
             theta_dot: Tensor, input data of recorded angular velocities (shape: [batch_size, 3])
             s_dot: Tensor, input data of recorded End-effector Cartesian velocities (shape: [batch_size, 3])
+            t: Tensor, time of each record (shape: [batch_size, 1])
             device: String, device to perform computation
         Output:
           Tuple containing:
             T_NN: Total Kinetic Energy, result of the forward pass through T_NNs    (shape: [batch_size, 1])
-            ddT_dtdThetaDot: Tensor of First-order Derivative of Total Kinetic Energy w.r.t theta_dot (shape: [batch_size, 3, 1])
-            ddT_dtdXDot: Tensor of First-order Derivative of Total Kinetic Energy w.r.t x_dot (shape: [batch_size, 3])
-            ddT_dtdYDot: Tensor of First-order Derivative of Total Kinetic Energy w.r.t y_dot (shape: [batch_size, 3])
-            ddT_dtdZDot: Tensor of First-order Derivative of Total Kinetic Energy w.r.t z_dot (shape: [batch_size, 3])
+            ddT_dtdThetaDot: Tensor of derivative of First-order Derivative of Total Kinetic Energy w.r.t theta_dot w.r.t time(shape: [batch_size, 3, 1])
+            ddT_dtdXDot: Tensor of derivative of First-order Derivative of Total Kinetic Energy w.r.t x_dot w.r.t time(shape: [batch_size, 1])
+            ddT_dtdYDot: Tensor of derivative of First-order Derivative of Total Kinetic Energy w.r.t y_dot w.r.t time(shape: [batch_size, 1])
+            ddT_dtdZDot: Tensor of derivative of First-order Derivative of Total Kinetic Energy w.r.t z_dot w.r.t time(shape: [batch_size, 1])
     """
-    s_dot = s_dot.to(device).requires_grad_(True)
-    theta_dot = theta_dot.to(device).requires_grad_(True)
-    t = t.to(device).requires_grad_(True)
+    s_dot = s_dot.requires_grad_(True)
+    theta_dot = theta_dot.requires_grad_(True)
+    t = t.requires_grad_(True)
     
-    T_NN = T_NNsInstance(theta_dot, s_dot, t)
+    T_NN = T_NNsInstance(theta_dot, s_dot, t).to(device).requires_grad_(True)
+    
+    print(f"T_NN requires_grad: {T_NN.requires_grad}")
+    print(f"T_NN grad_fn: {T_NN.grad_fn}")
     
     dT_dThetaDot = torch.autograd.grad(
         outputs = T_NN, inputs = theta_dot,
         grad_outputs=torch.ones_like(T_NN),
-        create_graph=True, retain_graph = True
+        create_graph=True, retain_graph = True,
+        allow_unused=False
     )[0]
+    
+    print(f"dT_dThetaDot is None? {dT_dThetaDot is None}")
     
     dT_dSDot = torch.autograd.grad(
         outputs = T_NN, inputs = s_dot,
         grad_outputs=torch.ones_like(T_NN),
-        create_graph=True, retain_graph = True
+        create_graph=True, retain_graph = True,
+        allow_unused=False
     )[0]
+
     
-    ddT_dtdThetaDot = torch.autograd.grad(
-        outputs = dT_dThetaDot, inputs = t,
-        grad_outputs=torch.ones_like(dT_dThetaDot),
-        create_graph=True, retain_graph = True
-    )[0]
+    ddT_dtdThetaDot = []
+    for i in range(3):
+        ddT_dtdThetaDot_i = torch.autograd.grad(
+            outputs = dT_dThetaDot[:, i], inputs = t,
+            grad_outputs = torch.ones_like(dT_dThetaDot[:, i]),
+            create_graph = True, retain_graph = True,
+            allow_unused = True
+        )[0]
+        ddT_dtdThetaDot.append(ddT_dtdThetaDot_i)
+    
+    ddT_dtdThetaDot = torch.stack(ddT_dtdThetaDot, dim=1)
     
     ddT_dtdSDot = []
     for i in range(3):  # Loop over x_dot, y_dot, z_dot
         ddT_dtdSDot_i = torch.autograd.grad(
             outputs=dT_dSDot[:, i], inputs=t,
             grad_outputs=torch.ones_like(dT_dSDot[:, i]),
-            create_graph=True, retain_graph=True
+            create_graph=True, retain_graph=True,
+            allow_unused=True
         )[0]
         ddT_dtdSDot.append(ddT_dtdSDot_i)
         
     ddT_dtdSDot = torch.stack(ddT_dtdSDot, dim=1)
     
-    ddT_dtdXDot = ddT_dtdSDot[:, 0]
-    ddT_dtdYDot = ddT_dtdSDot[:, 1]
-    ddT_dtdZDot = ddT_dtdSDot[:, 2]
+    ddT_dtdXDot = ddT_dtdSDot[:, 0, 0]
+    ddT_dtdYDot = ddT_dtdSDot[:, 1, 0]
+    ddT_dtdZDot = ddT_dtdSDot[:, 2, 0]
     
-    return T_NN, ddT_dtdThetaDot.unsqueeze(-1), ddT_dtdXDot, ddT_dtdYDot, ddT_dtdZDot
+    return T_NN, ddT_dtdThetaDot, ddT_dtdXDot, ddT_dtdYDot, ddT_dtdZDot
     
 def V_Derivative(
     V_NNsInstance: nn.Module, 
@@ -91,27 +107,28 @@ def V_Derivative(
             V_NNsInstance: An instance of Total Potential Energy Neural Network (V_NNs) with a forward method
             theta: Tensor, input data of recorded angles (shape: [batch_size, 3])
             z: Tensor, input data of recorded End-effector Cartesian Z-coordinate (shape: [batch_size, 1])
-            device: String, device to perform computation
         Output:
             V_NN: Total Potential Energy, result of the forward pass through V_NNs    (shape: [batch_size, 1])
             dV_dTheta: Tensor of First-order Derivative of Total Potential Energy w.r.t theta (shape: [batch_size, 3, 1])
             dV_dZ: Tensor of First-order Derivative of Total Kinetic Energy w.r.t z (shape: [batch_size, 1])
     """
-    z = z.to(device).requires_grad_(True)
-    theta = theta.to(device).requires_grad_(True)
+    z = z.requires_grad_(True)
+    theta = theta.requires_grad_(True)
     
-    V_NN = V_NNsInstance(theta, z)
+    V_NN = V_NNsInstance(theta, z).to(device)
     
     dV_dTheta = torch.autograd.grad(
         outputs = V_NN, inputs = theta,
         grad_outputs=torch.ones_like(V_NN),
-        create_graph=True, retain_graph = True
+        create_graph=True, retain_graph = True,
+        allow_unused=False
     )[0]
     
     dV_dZ = torch.autograd.grad(
         outputs = V_NN, inputs = z,
         grad_outputs=torch.ones_like(V_NN),
-        create_graph=True, retain_graph = True
+        create_graph=True, retain_graph = True,
+        allow_unused=False
     )[0]
     
     return V_NN, dV_dTheta.unsqueeze(-1), dV_dZ
@@ -145,8 +162,8 @@ class Dynamic_System(nn.Module):
         self.f_c2 = nn.Parameter(torch.tensor([0.05], requires_grad=True, device=device, dtype = dtype))
         self.f_c3 = nn.Parameter(torch.tensor([0.05], requires_grad=True, device=device, dtype = dtype)) 
         
-        self.T_NN = T_NNs(device).to(dtype)
-        self.V_NN = V_NNs(device).to(dtype)        
+        self.T_NN = T_NNs().to(dtype)
+        self.V_NN = V_NNs().to(dtype)        
         
         #-----Define parameters for the whole system which consists of M, B, G parameters and parameters like f_v and f_c-----#
         sub_net_params = []
@@ -195,9 +212,9 @@ class Dynamic_System(nn.Module):
         #---Define B matrix---#
         B = torch.zeros((q.shape[0], 3, 1), device = self.device)
         
-        B[:, 0, 0] = ddT_dtdXDot.squeeze()
-        B[:, 1, 0] = ddT_dtdYDot.squeeze()
-        B[:, 2, 0] = (ddT_dtdZDot + dV_dZ).squeeze()
+        B[:, 0, 0] = ddT_dtdXDot
+        B[:, 1, 0] = ddT_dtdYDot
+        B[:, 2, 0] = (ddT_dtdZDot + dV_dZ.squeeze())
         
         #---KAB matrix---#
         KAB = K @ torch.linalg.inv(A) @ B
@@ -214,11 +231,11 @@ class Dynamic_System(nn.Module):
         t: torch.Tensor
         ) -> torch.Tensor:
         
-        q = q.to(self.dtype)
-        q_dot = q_dot.to(self.dtype)
-        s = s.to(self.dtype)
-        s_dot = s_dot.to(self.dtype)
-        t = t.to(self.dtype)
+        q = q.to(self.dtype).to(self.device)
+        q_dot = q_dot.to(self.dtype).to(self.device)
+        s = s.to(self.dtype).to(self.device)
+        s_dot = s_dot.to(self.dtype).to(self.device)
+        t = t.to(self.dtype).to(self.device)
         
         batch_size = t.shape[0]
         
