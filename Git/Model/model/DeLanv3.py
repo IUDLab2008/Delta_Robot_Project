@@ -83,10 +83,6 @@ class Dynamic_System(nn.Module):
                 theta_dot_i
             )
             
-            print("ddLagrangian_dThetaDotdThetaDot shape:", ddLagrangian_dThetaDotdThetaDot.shape)
-            print("dLagragian_dTheta shape:", dLagragian_dTheta.shape)
-            print("ddLagrangian_dThetadThetaDot shape:", ddLagrangian_dThetadThetaDot.shape)
-            
             # Store results for this batch
             ddLagrangian_dThetaDotdThetaDot_batched.append(ddLagrangian_dThetaDotdThetaDot)
             dLagragian_dTheta_batched.append(dLagragian_dTheta)
@@ -104,13 +100,14 @@ class Dynamic_System(nn.Module):
             theta_dot, s_dot, theta, z
         )
         
-        print("ddLagrangian_dThetaDotdThetaDot shape:", ddLagrangian_dThetaDotdThetaDot.shape)
-        print("dLagragian_dTheta shape:", dLagragian_dTheta.shape)
-        print("ddLagrangian_dThetadThetaDot shape:", ddLagrangian_dThetadThetaDot.shape)
-        print("tau shape:", tau.shape)
-        
         # Assuming theta_dot needs to be unsqueezed for proper broadcasting
         theta_dot_expanded = theta_dot.unsqueeze(-1)
+        
+        print("ddLagrangian_dThetaDotdThetaDot shape:", ddLagrangian_dThetaDotdThetaDot.shape)
+        print("tau shape: ", tau.unsqueeze(-1).shape)
+        print("dLagragian_dTheta shape: ", dLagragian_dTheta.shape)
+        print("ddLagrangian_dThetadThetaDot shape: ", ddLagrangian_dThetadThetaDot.shape)
+        print("theta_dot_expanded shape: ", theta_dot_expanded.shape)
         
         # Compute the result for each batch
         result = torch.linalg.inv(ddLagrangian_dThetaDotdThetaDot) @ (
@@ -118,5 +115,7 @@ class Dynamic_System(nn.Module):
             dLagragian_dTheta - 
             ddLagrangian_dThetadThetaDot @ theta_dot_expanded
         )
+        
+        print("result shape:", result.shape)
         
         return result
