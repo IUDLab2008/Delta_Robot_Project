@@ -25,6 +25,10 @@ class Dynamic_System(nn.Module):
 
         self.Lagrangian_Function = LAGRANGIAN_NNs().to(self.device)
         self.B_NN = B_NNs(self.device)
+        
+        sub_net_params = []
+        sub_net_params.extend(list(self.B_NN.parameters()))
+        sub_net_params.extend(list(self.Lagrangian_Function.parameters()))
 
     def compute_dLagrangian_dThetaDot(
             self, 
@@ -65,6 +69,7 @@ class Dynamic_System(nn.Module):
             retain_graph=True,
             allow_unused=False
         )[0]
+        
         return dLagrangian_dTheta
 
 
@@ -79,27 +84,45 @@ class Dynamic_System(nn.Module):
         theta_dot = theta_dot.requires_grad_(True)
         theta = theta.requires_grad_(True)
         
-        Lagrangian = self.Lagrangian_Function(theta_dot, s_dot, theta, z).requires_grad_(True)
+        batch_size = theta_dot.shape[0]
         
-        dLagrangian_dThetaDot = self.compute_dLagrangian_dThetaDot(theta, theta_dot, s_dot, z)
+        ddLagrangian_dThetaDotdThetaDot_batched = []
+        dLagragian_dTheta_batched = []
+        ddLagrangian_dThetadThetaDot_batched = []
         
-        dLagrangian_dTheta = self.compute_dLagrangian_dTheta(theta, theta_dot, s_dot, z)
+        for i in range(batch_size):
+            theta_dot_i = theta_dot[i].unsqueeze(0)
+            s_dot_i = s_dot[i].unsqueeze(0)
+            theta_i = theta[i].unsqueeze(0)
+            z_i = z[i].unsqueeze(0)
         
-        ddLagrangian_dThetaDotdThetaDot = torch.autograd.functional.jacobian(
-            lambda theta_dot: self.compute_dLagrangian_dThetaDot(theta, theta_dot, s_dot, z),
-            theta_dot
-        )
+            Lagrangian_i = self.Lagrangian_Function(theta_dot_i, s_dot_i, theta_i, z_i).requires_grad_(True)
+            
+            dLagrangian_dThetaDot_i = self.compute_dLagrangian_dThetaDot(theta_i, theta_dot_i, s_dot_i, z_i)
+            
+            dLagrangian_dTheta_i = self.compute_dLagrangian_dTheta(theta_i, theta_dot_i, s_dot_i, z_i).permute(1, 0)
+            
+            ddLagrangian_dThetaDotdThetaDot_i = torch.autograd.functional.jacobian(
+                lambda theta_dot_i: self.compute_dLagrangian_dThetaDot(theta_i, theta_dot_i, s_dot_i, z_i),
+                theta_dot_i
+            ).squeeze()
+            
+            ddLagrangian_dThetadThetaDot_i = torch.autograd.functional.jacobian(
+                lambda theta_dot_i: self.compute_dLagrangian_dTheta(theta_i, theta_dot_i, s_dot_i, z_i),
+                theta_dot_i
+            ).squeeze()
+            
+            ddLagrangian_dThetaDotdThetaDot_batched.append(ddLagrangian_dThetaDotdThetaDot_i)
+            dLagragian_dTheta_batched.append(dLagrangian_dTheta_i)
+            ddLagrangian_dThetadThetaDot_batched.append(ddLagrangian_dThetadThetaDot_i)
         
-        ddLagrangian_dThetadThetaDot = torch.autograd.functional.jacobian(
-            lambda theta_dot: self.compute_dLagrangian_dTheta(theta, theta_dot, s_dot, z),
-            theta_dot
-        )
+        ddLagrangian_dThetaDotdThetaDot = torch.stack(ddLagrangian_dThetaDotdThetaDot_batched)
+        dLagrangian_dTheta = torch.stack(dLagragian_dTheta_batched)
+        ddLagrangian_dThetadThetaDot = torch.stack(ddLagrangian_dThetadThetaDot_batched)
         
-        print("dLagrangian_dTheta shape: ", dLagrangian_dTheta.shape)
-        print("ddLagrangian_dThetadThetaDot shape: ", ddLagrangian_dThetadThetaDot.shape)
-        print("ddLagrangian_dThetaDotdThetaDot shape: ", ddLagrangian_dThetaDotdThetaDot.shape)
+
         
-        return ddLagrangian_dThetaDotdThetaDot.unsqueeze(-1), dLagrangian_dTheta.unsqueeze(-1), ddLagrangian_dThetadThetaDot.unsqueeze(-1)
+        return ddLagrangian_dThetaDotdThetaDot, dLagrangian_dTheta, ddLagrangian_dThetadThetaDot
 
     def forward(
             self, 
@@ -109,8 +132,8 @@ class Dynamic_System(nn.Module):
             z: torch.Tensor, 
             s: torch.Tensor, 
             s_Ddot: torch.Tensor, 
-            tau: torch.Tensor
-        ) -> torch.Tensor:
+            tau: torch.Tensor 
+        ) -> torch.Tensor: 
         
         ddLagrangian_dThetaDotdThetaDot, dLagragian_dTheta, ddLagrangian_dThetadThetaDot = self.Compute_Derivatives(
             theta_dot, s_dot, theta, z
@@ -124,7 +147,5 @@ class Dynamic_System(nn.Module):
             dLagragian_dTheta - 
             ddLagrangian_dThetadThetaDot @ theta_dot_expanded
         )
-        
-        print("result shape:", result.shape)
-        
+                        
         return result
